@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.env
+config/
+*.pfx
+.DS_Store
+logs/
+node_modules/
+frontend/node_modules/
+src/LancachePrefill/wwwroot/assets/

@@ -1,0 +1,183 @@
+{
+  "app": {
+    "title": "Lancache Prefill",
+    "subtitle": "Steam game cache management"
+  },
+  "nav": {
+    "selectedGames": "Selected Games",
+    "steamLibrary": "Steam Library",
+    "evicted": "Evicted",
+    "cacheBrowser": "Cache Browser",
+    "settings": "Settings"
+  },
+  "actions": {
+    "sync": "Sync",
+    "syncN": "Sync ({0} updates)",
+    "forceResync": "Force Re-sync",
+    "scanLancache": "Scan Lancache",
+    "refreshManifests": "Refresh Manifests",
+    "cancel": "Cancel",
+    "add": "Add",
+    "remove": "Remove",
+    "check": "Check",
+    "save": "Save",
+    "login": "Login",
+    "submit": "Submit",
+    "back": "Back",
+    "loadMore": "Load more...",
+    "addFiltered": "Add Filtered",
+    "recache": "Re-cache",
+    "reconcile": "Reconcile Cache"
+  },
+  "selected": {
+    "addById": "Add by App ID...",
+    "sortName": "Name",
+    "sortId": "App ID",
+    "sortStatus": "Status",
+    "sort": "Sort:",
+    "empty": "No games selected. {0}.",
+    "emptyLink": "Add games from the Steam Library tab",
+    "failedLoad": "Failed to load"
+  },
+  "library": {
+    "search": "Search your Steam library...",
+    "noMatches": "No matches",
+    "noGames": "No games found",
+    "remaining": "{0} more"
+  },
+  "evicted": {
+    "desc": "Games evicted from Lancache. Excluded from scheduled prefill.",
+    "empty": "No evicted games."
+  },
+  "cacheBrowser": {
+    "desc": "All games found in the Lancache cache, including other accounts.",
+    "search": "Search cached games...",
+    "empty": "Run a scan to populate this view.",
+    "noMatches": "No matches",
+    "noCached": "No cached games found",
+    "chunks": "chunks",
+    "remaining": "{0} more — refine your search"
+  },
+  "settings": {
+    "prefillSchedule": "Prefill Schedule (cron)",
+    "scanSchedule": "Scan Schedule (cron)",
+    "scanConcurrency": "Scan Concurrency",
+    "saved": "Saved",
+    "reconcileDesc": "Rebuild scan results from existing cache index (no filesystem read)",
+    "settingsSaved": "Settings saved — restart to apply schedule changes",
+    "failedSave": "Failed to save"
+  },
+  "login": {
+    "title": "Steam Login",
+    "username": "Steam username",
+    "password": "Password",
+    "enterBoth": "Enter username and password",
+    "incorrectPassword": "Incorrect password",
+    "tooMany": "Too many attempts — wait 5 minutes",
+    "connectionError": "Connection error",
+    "deviceApprove": "Approve on your {0}",
+    "steamApp": "Steam app",
+    "waitingConfirm": "Waiting for confirmation...",
+    "useCode": "Use a code instead",
+    "enterCode": "Enter a code",
+    "codeFromEmail": "Enter the code sent to your email",
+    "enter2fa": "Enter your 2FA code",
+    "invalidCode": "Invalid code — try again",
+    "twoFaPlaceholder": "2FA or email code"
+  },
+  "confirm": {
+    "removeGame": "Remove Game",
+    "removeGameMsg": "Remove \"{0}\" from selected games?",
+    "removeEvicted": "Remove Evicted Game",
+    "removeEvictedMsg": "Permanently remove \"{0}\"?",
+    "addFiltered": "Add Filtered Games",
+    "addFilteredMsg": "Add {0} games matching \"{1}\"?",
+    "logout": "Disconnect Steam",
+    "logoutMsg": "Clear session and stored credentials?"
+  },
+  "toast": {
+    "jobRunning": "A job is already running",
+    "requestFailed": "Request failed ({0})",
+    "prefillStarted": "Prefill started",
+    "syncQueued": "Sync queued",
+    "cancelling": "Cancelling...",
+    "deepScanStarted": "Deep scan started",
+    "quickScanStarted": "Quick scan started",
+    "scanFailed": "Failed to start scan",
+    "manifestsRefreshed": "Manifests refreshed",
+    "updateAvailable": "Update available",
+    "upToDate": "Up to date",
+    "appAdded": "App {0} added",
+    "invalidAppId": "Enter a valid App ID",
+    "failedRemove": "Failed to remove",
+    "failed": "Failed",
+    "recacheStarted": "Re-cache started",
+    "filterFirst": "Enter a search filter first",
+    "noUnselected": "No unselected games match",
+    "addedN": "Added {0} games",
+    "reconcileStarted": "Reconcile started"
+  },
+  "scan": {
+    "title": "Scan Lancache",
+    "chooseMode": "Choose scan mode",
+    "quickScan": "Quick Scan",
+    "quickDesc": "Delta only — checks for changes since last scan",
+    "deepScan": "Deep Scan",
+    "deepDesc": "Full re-scan of all cache files",
+    "initialDeep": "Initial Deep Scan",
+    "initialDesc": "Required on first run — indexes all cache files",
+    "fullRescan": "Full Re-scan",
+    "fullDesc": "Only needed if facing inconsistencies"
+  },
+  "prefill": {
+    "title": "Prefill",
+    "starting": "starting...",
+    "games": "games",
+    "current": "Current:",
+    "transferred": "Transferred:",
+    "queued": "Queued ({0})",
+    "upNext": "Up next:"
+  },
+  "progress": {
+    "indexing": "Indexing cache...",
+    "scanPct": "Scan {0}% ({1}/{2})",
+    "prefillPct": "Prefill {0}%",
+    "cached": "cached",
+    "notCached": "not cached",
+    "discoveredInCache": "Discovered in cache ({0})",
+    "selectedCached": "Selected & cached ({0})",
+    "notInCache": "Not in cache ({0})",
+    "partiallyCached": "Partially cached ({0})"
+  },
+  "info": {
+    "lancache": "Lancache",
+    "cacheSize": "Cache Size",
+    "lastSync": "Last Sync",
+    "lastScan": "Last Scan",
+    "manifests": "Manifests"
+  },
+  "lancache": {
+    "noDetected": "No Lancache detected.",
+    "dnsNotResolving": "DNS for {0} is not resolving to a private IP."
+  },
+  "badge": {
+    "cached": "Cached",
+    "missing": "Missing",
+    "partial": "Partial",
+    "current": "Current",
+    "updateAvailable": "Update available",
+    "selected": "Selected"
+  },
+  "tips": [
+    "Warming up the cache...",
+    "Why prefill when you could be gaming?",
+    "Downloading the internet, one chunk at a time",
+    "Your future self will thank you for this",
+    "Caching: because waiting for downloads is so 2010",
+    "Preparing to make your LAN party legendary",
+    "Teaching your NAS to speak Steam",
+    "Buffering... just kidding, that's what we're fixing",
+    "Your games are closer than they appear",
+    "Making bandwidth jealous since 2026"
+  ]
+}

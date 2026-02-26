@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23e94560'/><text x='50' y='68' font-size='60' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>LP</text></svg>">
+<title>Lancache Prefill</title>
+</head>
+<body>
+<div class="container">
+  <div class="header-row">
+    <div>
+      <h1>Lancache Prefill</h1>
+      <p class="sub">Steam game cache management</p>
+    </div>
+    <div class="header-actions">
+      <span class="info-btn" id="infoBtn" style="display:none" onclick="_app.toggleInfoPopover()">ℹ</span>
+      <button class="icon-btn" id="themeToggle" onclick="_app.toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="icon-btn" id="logoutBtn" onclick="_app.doLogout()" style="display:none" title="Disconnect Steam">⏻</button>
+    </div>
+  </div>
+
+  <div id="infoPopover" class="info-popover" style="display:none">
+    <div class="info-popover-row"><strong>Lancache</strong> <span id="infoLancacheIp">—</span></div>
+    <div class="info-popover-row"><strong>Cache Size</strong> <span id="infoCacheSize">—</span></div>
+    <div class="info-popover-row"><strong>Last Sync</strong> <span id="infoLastSync">—</span></div>
+    <div class="info-popover-row"><strong>Last Scan</strong> <span id="infoLastScan">—</span></div>
+    <div class="info-popover-row"><strong>Manifests</strong> <span id="infoManifests">—</span></div>
+  </div>
+
+  <div id="lancacheWarning" class="alert-banner alert-warn" style="display:none">
+    <strong>No Lancache detected.</strong> DNS for <code>lancache.steamcontent.com</code> is not resolving to a private IP.
+  </div>
+
+  <div class="acts">
+    <button class="btn btn-a" id="bSync" onclick="_app.prefill(false)">⟳ Sync</button>
+    <button class="btn btn-b" id="bForce" onclick="_app.prefill(true)">⟳ Force Re-sync</button>
+    <button class="btn btn-b" id="bScan" onclick="_app.startScan()">🔍 Scan Lancache</button>
+    <button class="btn btn-b" id="bRefresh" onclick="_app.refreshManifests()">↻ Refresh Manifests</button>
+    <button class="btn btn-d" id="bCancel" onclick="_app.cancelJob()" style="display:none">✕ Cancel</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="_app.switchTab('selected')">Selected Games</div>
+    <div class="tab" onclick="_app.switchTab('library')">Steam Library</div>
+    <div class="tab" onclick="_app.switchTab('evicted')">Evicted</div>
+    <div class="tab" onclick="_app.switchTab('cachebrowser')">Cache Browser</div>
+    <div class="tab" onclick="_app.switchTab('settings')">Settings</div>
+  </div>
+
+  <div id="tabSelected">
+    <div class="add-row">
+      <input class="search" id="addAppId" type="number" min="1" placeholder="Add by App ID..." style="width:200px;margin-bottom:0" onkeydown="if(event.key==='Enter')_app.addById()">
+      <button class="btn btn-g btn-s" onclick="_app.addById()">+ Add</button>
+      <div class="sort-controls">
+        <label>Sort:</label>
+        <select id="sortSelected" onchange="_app.renderApps()">
+          <option value="name">Name</option>
+          <option value="id">App ID</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
+    </div>
+    <div class="tbl">
+      <div class="th"><span class="col-id">ID</span><span>Name</span><span class="col-cache">Cache</span><span class="col-update">Status</span><span>Actions</span></div>
+      <div id="rows"><div class="empty"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <div id="tabLibrary" style="display:none">
+    <div class="lib-toolbar">
+      <input class="search" id="libSearch" placeholder="Search your Steam library..." oninput="_app.filterLibrary()" style="flex:1;margin-bottom:0">
+      <button class="btn btn-g btn-s" onclick="_app.selectFiltered()">+ Add Filtered</button>
+    </div>
+    <div class="tbl">
+      <div class="th-lib"><span class="col-id">ID</span><span>Name</span><span></span></div>
+      <div id="libRows"><div class="empty"><div class="spinner"></div></div></div>
+    </div>
+    <div id="libLoadMore" style="display:none;text-align:center;padding:12px">
+      <button class="btn btn-b btn-s" onclick="_app.showMoreLibrary()">Load more...</button>
+      <span id="libRemaining" style="color:var(--muted);font-size:12px;margin-left:8px"></span>
+    </div>
+  </div>
+
+  <div id="tabEvicted" style="display:none">
+    <p class="tab-desc">Games evicted from Lancache. Excluded from scheduled prefill.</p>
+    <div class="tbl">
+      <div class="th-evict"><span class="col-id">ID</span><span>Name</span><span>Actions</span></div>
+      <div id="evictedRows"><div class="empty"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <div id="tabCachebrowser" style="display:none">
+    <p class="tab-desc">All games found in the Lancache cache, including other accounts.</p>
+    <input class="search" id="cacheSearch" placeholder="Search cached games..." oninput="_app.filterCacheBrowser()">
+    <div class="tbl">
+      <div class="th-cache"><span class="col-id">ID</span><span>Name</span><span class="col-chunks">Chunks</span><span></span></div>
+      <div id="cacheRows"><div class="empty">Run a scan to populate this view.</div></div>
+    </div>
+  </div>
+
+  <div id="tabSettings" style="display:none">
+    <div class="tbl" style="padding:20px">
+      <div class="setting-row">
+        <label>Prefill Schedule (cron)</label>
+        <input class="search" id="setPrefillSchedule" style="margin-bottom:0" placeholder="0 4 * * *">
+      </div>
+      <div class="setting-row">
+        <label>Scan Schedule (cron)</label>
+        <input class="search" id="setScanSchedule" style="margin-bottom:0" placeholder="0 3 */3 * *">
+      </div>
+      <div class="setting-row">
+        <label>Scan Concurrency</label>
+        <input class="search" id="setScanConcurrency" type="number" min="1" max="16" style="margin-bottom:0;width:80px" placeholder="4">
+      </div>
+      <button class="btn btn-a" onclick="_app.saveSettings()">💾 Save</button>
+      <span id="settingsSaved" style="color:var(--green);font-size:13px;margin-left:12px;display:none">✓ Saved</span>
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--primary)">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px">Rebuild scan results from existing cache index (no filesystem read)</label>
+        <button class="btn btn-b" id="bReconcile" onclick="_app.reconcileCache()">Reconcile Cache</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="prefillPill" class="pill pill-prefill" style="display:none;bottom:56px" onclick="document.getElementById('prefillPanel').style.display='block'">
+  <span id="prefillPillText"></span>
+</div>
+<div id="prefillPanel" class="panel" style="display:none;bottom:96px">
+  <div class="panel-header"><strong>Prefill</strong><span class="panel-close" onclick="document.getElementById('prefillPanel').style.display='none'">×</span></div>
+  <div id="prefillPanelBody" class="panel-body"></div>
+</div>
+
+<div id="scanPill" class="pill pill-scan" style="display:none" onclick="document.getElementById('scanPanel').style.display='block'">
+  <span id="scanPillText"></span>
+</div>
+<div id="scanPanel" class="panel" style="display:none">
+  <div class="panel-header"><strong>Lancache Scan</strong><span class="panel-close" onclick="document.getElementById('scanPanel').style.display='none'">×</span></div>
+  <div id="scanPanelBody" class="panel-body"></div>
+</div>
+
+<div class="overlay" id="scanDialog" style="display:none">
+  <div class="dialog">
+    <h2>🔍 Scan Lancache</h2>
+    <p class="dialog-desc">Choose scan mode</p>
+    <button class="btn btn-a dialog-btn" onclick="_app.doScan(false)">Quick Scan<br><span class="dialog-sub">Delta only</span></button>
+    <button class="btn btn-b dialog-btn" onclick="_app.doScan(true)">Deep Scan<br><span class="dialog-sub">Full re-scan</span></button>
+    <span class="link" onclick="document.getElementById('scanDialog').style.display='none'">Cancel</span>
+  </div>
+</div>
+
+<div class="overlay" id="confirmDialog" style="display:none">
+  <div class="dialog" style="width:340px">
+    <h2 id="confirmTitle">Confirm</h2>
+    <p id="confirmMsg" class="dialog-desc"></p>
+    <button class="btn btn-d dialog-btn" id="confirmYes">Remove</button>
+    <span class="link" onclick="_app.closeConfirm()">Cancel</span>
+  </div>
+</div>
+
+<div class="overlay" id="loginOverlay" style="display:none">
+  <div class="dialog">
+    <h2>Steam Login</h2>
+    <div class="login-step active" id="stepCreds">
+      <div class="msg" id="loginMsg"></div>
+      <input id="lUser" placeholder="Steam username" onkeydown="if(event.key==='Enter')document.getElementById('lPass').focus()">
+      <input id="lPass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')_app.doLogin()">
+      <button class="btn btn-a dialog-btn" onclick="_app.doLogin()">Login</button>
+    </div>
+    <div class="login-step" id="stepDevice">
+      <div class="spinner"></div>
+      <p style="margin:12px 0;font-size:15px">Approve on your <strong>Steam app</strong></p>
+      <p style="color:var(--muted);font-size:12px">Waiting for confirmation...</p>
+      <span class="link" onclick="_app.showStep('stepCode')">Use a code instead</span>
+    </div>
+    <div class="login-step" id="stepCode">
+      <div class="msg" id="codeMsg"></div>
+      <input id="lCode" placeholder="2FA or email code" onkeydown="if(event.key==='Enter')_app.submitCode()">
+      <button class="btn btn-a dialog-btn" onclick="_app.submitCode()">Submit</button>
+      <span class="link" onclick="_app.showStep('stepCreds')">Back</span>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+services:
+  lancache-prefill:
+    build: .
+    container_name: lancache-prefill
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ${CONFIG_DIR:-./config}:/Config
+      - ${LANCACHE_CACHE_DIR:-./cache}:/LancacheCache:ro
+    environment:
+      - CONFIG_DIR=/Config
+      - LANCACHE_CACHE_DIR=/LancacheCache
+      - PREFILL_SCHEDULE=${PREFILL_SCHEDULE:-0 4 * * *}
+      - SCAN_SCHEDULE=${SCAN_SCHEDULE:-0 3 */3 * *}
+      - PORT=${PORT:-28542}
+      - TZ=${TZ:-Europe/London}

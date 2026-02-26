@@ -1,0 +1,3 @@
+/* Theme variables */
+[data-theme="dark"]{--bg:#1a1a2e;--surface:#16213e;--primary:#0f3460;--accent:#e94560;--text:#eee;--muted:#888;--green:#4caf50;--yellow:#ff9800;--red:#f44336;--blue:#2196f3;--hover:rgba(255,255,255,.03);--border:rgba(255,255,255,.04)}
+[data-theme="light"]{--bg:#f0f2f5;--surface:#fff;--primary:#d0d5dd;--accent:#e94560;--text:#1a1a2e;--muted:#666;--green:#2e7d32;--yellow:#e65100;--red:#c62828;--blue:#1565c0;--hover:rgba(0,0,0,.03);--border:rgba(0,0,0,.06)}

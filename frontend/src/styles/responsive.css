@@ -1,0 +1,79 @@
+/* Tablet / small desktop */
+@media(max-width:768px){
+  .container{padding:12px}
+  h1{font-size:18px}
+
+  /* Selected Games: hide ID, tighten columns */
+  .th,.tr{grid-template-columns:minmax(80px,1fr) minmax(50px,70px) minmax(50px,70px) minmax(70px,100px);font-size:12px;padding:8px 10px;gap:4px}
+  .col-id{display:none}
+  .game-thumb{display:none}
+
+  /* Library */
+  .th-lib,.lib-row{grid-template-columns:minmax(80px,1fr) minmax(60px,70px);padding:8px 10px}
+  .lib-row .col-id{display:none}
+  .th-lib .col-id{display:none}
+
+  /* Evicted */
+  .th-evict,.evict-row{grid-template-columns:minmax(80px,1fr) minmax(100px,140px);padding:8px 10px}
+  .evict-row .col-id{display:none}
+  .th-evict .col-id{display:none}
+
+  /* Cache Browser */
+  .th-cache,.cache-row{grid-template-columns:minmax(80px,1fr) minmax(50px,70px) minmax(60px,70px);padding:8px 10px}
+  .cache-row .col-id{display:none}
+  .th-cache .col-id{display:none}
+
+  /* Actions */
+  .acts{gap:6px}
+  .btn{padding:8px 12px;font-size:12px}
+  .tab{padding:8px 12px;font-size:13px}
+
+  /* Panels & pills */
+  .panel{width:calc(100vw - 20px);right:10px;bottom:56px;max-height:50vh}
+  .panel-body{max-height:calc(50vh - 50px)}
+  .pill{right:10px;bottom:10px;font-size:12px;padding:6px 12px}
+
+  /* Form controls */
+  .add-row{flex-direction:column;align-items:stretch}
+  .sort-controls{margin-left:0}
+  .lib-toolbar{flex-direction:column}
+  .info-popover{right:10px;left:10px;min-width:auto}
+
+  /* Dialog */
+  .dialog{width:calc(100vw - 40px);padding:20px}
+}
+
+/* Phone */
+@media(max-width:480px){
+  /* Selected Games: hide Cache column too */
+  .th,.tr{grid-template-columns:minmax(60px,1fr) minmax(50px,70px) minmax(70px,90px);gap:4px}
+  .col-cache{display:none}
+
+  /* Evicted: stack buttons */
+  .th-evict,.evict-row{grid-template-columns:minmax(60px,1fr) minmax(80px,120px)}
+  .evict-row .btn{padding:4px 8px;font-size:10px}
+
+  /* Cache Browser: hide chunks column */
+  .th-cache,.cache-row{grid-template-columns:minmax(60px,1fr) minmax(60px,70px)}
+  .col-chunks{display:none}
+
+  /* Smaller elements */
+  .badge{font-size:9px;padding:2px 5px}
+  .btn-s{padding:4px 8px;font-size:10px}
+  .tab{padding:6px 10px;font-size:12px}
+
+  /* Pill: allow wrapping */
+  .pill{white-space:normal;font-size:11px;max-width:calc(100vw - 30px)}
+  .pill-prefill{bottom:50px}
+
+  /* Stacked panels */
+  .panel{bottom:80px}
+}
+
+/* Very small screens (320px) */
+@media(max-width:360px){
+  .container{padding:8px}
+  .th,.tr{padding:6px 8px;font-size:11px}
+  .acts .btn{padding:6px 10px;font-size:11px}
+  h1{font-size:16px}
+}

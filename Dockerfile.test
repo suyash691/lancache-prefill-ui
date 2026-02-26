@@ -1,0 +1,15 @@
+# Stage 1: Frontend tests + build
+FROM node:20-alpine AS frontend-test
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm test
+RUN npm run build
+
+# Stage 2: Backend tests (with frontend build output)
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+WORKDIR /repo
+COPY . .
+COPY --from=frontend-test /src/LancachePrefill/wwwroot/ src/LancachePrefill/wwwroot/
+RUN dotnet test tests/LancachePrefill.Tests/LancachePrefill.Tests.csproj --verbosity normal

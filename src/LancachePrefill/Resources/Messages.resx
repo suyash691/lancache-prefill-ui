@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter</value></resheader>
+
+  <!-- API Errors -->
+  <data name="Error_Unauthorized"><value>Unauthorized</value></data>
+  <data name="Error_NotLoggedIn"><value>Not logged in</value></data>
+  <data name="Error_JobRunning"><value>{0} is running</value></data>
+  <data name="Error_JobAlreadyRunning"><value>Job already running</value></data>
+  <data name="Error_NoLancache"><value>No Lancache detected</value></data>
+  <data name="Error_NoCacheDir"><value>LANCACHE_CACHE_DIR not configured or missing</value></data>
+  <data name="Error_NoCacheData"><value>No cache data — run a scan first</value></data>
+  <data name="Error_NoDepots"><value>No depots</value></data>
+  <data name="Error_NoAccessibleDepots"><value>No accessible depots</value></data>
+  <data name="Error_ManifestCodeFailed"><value>No manifest code for depot {0}</value></data>
+  <data name="Error_ManifestDownloadFailed"><value>Manifest download failed for depot {0}</value></data>
+  <data name="Error_NoCdnServers"><value>No CDN servers available</value></data>
+
+  <!-- Scan Status -->
+  <data name="Scan_LoadingCacheIndex"><value>Loading cache index from DB...</value></data>
+  <data name="Scan_LoadingMetadata"><value>Loading app metadata...</value></data>
+  <data name="Scan_ScanningDir"><value>Scanning cache directory...</value></data>
+  <data name="Scan_ScanningDirProgress"><value>Scanning cache directory... {0}/{1}</value></data>
+  <data name="Scan_ReadingNewEntries"><value>Reading {0} new cache entries...</value></data>
+  <data name="Scan_ReadingProgress"><value>Reading new entries... {0}/{1}</value></data>
+  <data name="Scan_ProcessingEvictions"><value>Processing evictions...</value></data>
+  <data name="Scan_CheckingStatus"><value>Checking game cache status...</value></data>
+  <data name="Scan_ResolvingDepots"><value>Resolving unknown depots...</value></data>
+  <data name="Scan_AppProgress"><value>[{0}/{1}] {2}</value></data>
+  <data name="Scan_Cancelled"><value>cancelled</value></data>
+  <data name="Scan_Done"><value>done</value></data>
+  <data name="Scan_ClearingPrevious"><value>Clearing previous scan data...</value></data>
+
+  <!-- Prefill Status -->
+  <data name="Prefill_Done"><value>done: {0} updated, {1} current, {2} failed</value></data>
+  <data name="Prefill_Cancelled"><value>cancelled: {0} updated, {1} current, {2} failed</value></data>
+
+  <!-- UI Messages -->
+  <data name="CacheBrowser_Empty"><value>Run a Lancache scan first to populate cache browser.</value></data>
+  <data name="Settings_RestartRequired"><value>Settings saved — restart to apply schedule changes</value></data>
+
+  <!-- App Fallback -->
+  <data name="App_FallbackName"><value>App {0}</value></data>
+</root>

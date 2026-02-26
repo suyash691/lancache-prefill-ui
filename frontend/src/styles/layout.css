@@ -1,0 +1,87 @@
+/* Header */
+.header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+.header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+h1{margin-bottom:4px;font-size:22px}
+.sub{color:var(--muted);font-size:14px}
+.acts{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+
+/* Info popover */
+.info-btn{width:32px;height:32px;border-radius:50%;background:var(--primary);color:var(--muted);font-size:14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.info-btn:hover{color:var(--text);background:var(--accent);border-color:var(--accent)}
+.info-popover{position:absolute;top:60px;right:20px;background:var(--surface);border:1px solid var(--primary);border-radius:8px;padding:12px 16px;z-index:60;box-shadow:0 4px 20px rgba(0,0,0,.3);min-width:260px;font-size:13px}
+.info-popover-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+.info-popover-row:last-child{border-bottom:none}
+.info-popover-row strong{color:var(--muted);font-weight:600;margin-right:12px}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);font-weight:600;font-size:14px;white-space:nowrap;transition:all .2s;border-radius:6px 6px 0 0;flex-shrink:0}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);background:var(--surface)}
+.tab:hover:not(.active){background:var(--hover)}
+.tab .tab-count{font-size:11px;opacity:.7;margin-left:2px}
+.tab-desc{color:var(--muted);font-size:13px;margin-bottom:12px}
+
+/* Tables — fluid grid with minmax */
+.tbl{background:var(--surface);border-radius:8px;overflow:hidden;margin-bottom:16px}
+
+/* Selected Games: ID | Name | Cache | Status | Actions */
+.th,.tr{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,90px) minmax(80px,110px);padding:10px 14px;align-items:center;gap:6px}
+.th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
+.tr{border-bottom:1px solid var(--border);transition:background .15s}
+.tr:hover{background:var(--hover)}
+
+/* Library: ID | Name | Action */
+.th-lib,.lib-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
+.th-lib{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
+.lib-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
+.lib-row:hover{background:var(--hover)}
+.lib-selected{background:rgba(76,175,80,.05)}
+
+/* Evicted: ID | Name | Actions */
+.th-evict,.evict-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(120px,180px);padding:8px 14px;align-items:center;gap:6px}
+.th-evict{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
+.evict-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
+.evict-row:hover{background:var(--hover)}
+
+/* Cache Browser: ID | Name | Chunks | Action */
+.th-cache,.cache-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
+.th-cache{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
+.cache-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
+.cache-row:hover{background:var(--hover)}
+
+/* Game thumbnail & name — text overflow */
+.game-name{display:flex;align-items:center;gap:8px;min-width:0}
+.game-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game-thumb{width:46px;height:22px;border-radius:3px;object-fit:cover;background:var(--primary);flex-shrink:0}
+
+/* Add row & sort */
+.add-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.sort-controls{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.sort-controls select{background:var(--surface);color:var(--text);border:1px solid var(--primary);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer}
+.lib-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+
+/* Settings */
+.setting-row{margin-bottom:16px}
+.setting-row label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+.cron-hint{font-size:11px;color:var(--muted);display:block;margin-top:2px}
+
+/* Progress pills & panels */
+.pill{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--primary);border-radius:20px;padding:8px 16px;cursor:pointer;font-size:13px;z-index:50;box-shadow:0 2px 12px rgba(0,0,0,.4);transition:border-color .3s;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill-prefill.active-pill{border-color:var(--blue)}
+.pill-scan.active-pill{border-color:var(--yellow)}
+.panel{position:fixed;bottom:60px;right:20px;width:420px;max-width:calc(100vw - 40px);max-height:60vh;background:var(--surface);border:1px solid var(--primary);border-radius:8px;z-index:51;box-shadow:0 4px 20px rgba(0,0,0,.5);overflow:hidden}
+.panel-header{padding:12px 16px;border-bottom:1px solid var(--primary);display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.panel-close{cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+.panel-close:hover{color:var(--text)}
+.panel-body{padding:12px 16px;max-height:calc(60vh - 50px);overflow-y:auto;font-size:13px}
+.panel-progress{height:4px;background:var(--primary);border-radius:2px;margin:8px 0;overflow:hidden}
+.panel-progress-bar{height:100%;transition:width .3s}
+.panel-progress-bar.prefill-bar{background:var(--blue)}
+.panel-progress-bar.scan-bar{background:var(--yellow)}
+.panel-progress-bar.chunk-bar{background:var(--green)}
+.chunk-progress{margin:6px 0;padding:4px 0}
+.chunk-progress-label{font-size:11px;color:var(--muted);margin-bottom:3px}
+.scan-group{font-weight:600;margin:8px 0 4px}
+.scan-row{padding:3px 0;border-bottom:1px solid var(--border)}
+.scan-row-flex{display:flex;justify-content:space-between;align-items:center;gap:8px}
