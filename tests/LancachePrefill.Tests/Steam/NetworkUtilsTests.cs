@@ -25,9 +25,15 @@ public class NetworkUtilsTests
         Assert.Equal(expected, NetworkUtils.IsPrivateIp(IPAddress.Parse(ip)));
     }
 
-    [Fact]
-    public void IsPrivateIp_IPv6_ReturnsFalse()
+    [Theory]
+    [InlineData("::1", true)]                          // IPv6 loopback
+    [InlineData("fe80::1", true)]                       // link-local
+    [InlineData("fd00::1", true)]                       // unique local (ULA)
+    [InlineData("fc00::1", true)]                       // unique local (ULA)
+    [InlineData("2606:4700:4700::1111", false)]         // global (Cloudflare)
+    [InlineData("2001:4860:4860::8888", false)]         // global (Google)
+    public void IsPrivateIp_IPv6(string ip, bool expected)
     {
-        Assert.False(NetworkUtils.IsPrivateIp(IPAddress.IPv6Loopback));
+        Assert.Equal(expected, NetworkUtils.IsPrivateIp(IPAddress.Parse(ip)));
     }
 }

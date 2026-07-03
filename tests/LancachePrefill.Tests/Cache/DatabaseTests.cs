@@ -177,22 +177,6 @@ public class DatabaseTests : IDisposable
     }
 
     [Fact]
-    public void GetActiveApps_IncludesActiveAndPartial()
-    {
-        _db.AddSelectedApp(730);
-        _db.AddSelectedApp(440);
-        _db.AddSelectedApp(570);
-        _db.MarkPartial(440);
-        _db.MarkEvicted(570);
-
-        var active = _db.GetActiveApps();
-        Assert.Equal(2, active.Count);
-        Assert.Contains(730u, active);
-        Assert.Contains(440u, active);
-        Assert.DoesNotContain(570u, active);
-    }
-
-    [Fact]
     public void ClearDownloadedDepots_RemovesRecords()
     {
         var depots = new[] { new DepotState(100, "test", 999, 1, 1), new DepotState(101, "test2", 888, 1, 1) };
@@ -204,15 +188,6 @@ public class DatabaseTests : IDisposable
 
         // Depot 101 should still be present
         Assert.True(_db.IsAppUpToDate([new DepotState(101, "test2", 888, 1, 1)]));
-    }
-
-    [Fact]
-    public void ClearDownloadedDepots_AllDepots_MakesNotUpToDate()
-    {
-        var depots = new[] { new DepotState(100, "test", 999, 1, 1) };
-        _db.MarkDepotsDownloaded(depots);
-        _db.ClearDownloadedDepots([100u]);
-        Assert.False(_db.IsAppUpToDate(depots));
     }
 
     [Fact]

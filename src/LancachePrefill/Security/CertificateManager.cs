@@ -37,6 +37,15 @@ public static class CertificateManager
         san.AddDnsName(Environment.MachineName);
         san.AddIpAddress(System.Net.IPAddress.Loopback);
         san.AddIpAddress(System.Net.IPAddress.IPv6Loopback);
+        // Include the host's private LAN addresses so browsing to https://<lan-ip>:PORT
+        // doesn't produce a certificate name mismatch.
+        try
+        {
+            foreach (var addr in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName()))
+                if (NetworkUtils.IsPrivateIp(addr) && !System.Net.IPAddress.IsLoopback(addr))
+                    san.AddIpAddress(addr);
+        }
+        catch { /* best effort — loopback SAN entries still work */ }
         request.CertificateExtensions.Add(san.Build());
 
         var cert = request.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(10));

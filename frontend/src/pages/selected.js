@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, steamThumb } from '../api.js';
+import { api, steamThumb, esc } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { showConfirm } from '../ui/confirm.js';
 import { updateTabCounts } from '../ui/tabs.js';
@@ -59,7 +59,7 @@ export function renderApps() {
     const actionBtn = needsSync
       ? `<button class="btn btn-a btn-s" data-action="prefillOne" data-id="${id}">⟳ ${t('actions.sync')}</button>`
       : `<button class="btn btn-b btn-s" data-action="checkUpdate" data-id="${id}">${t('actions.check')}</button>`;
-    return `<div class="tr" data-appid="${id}"><span class="col-id"><a href="https://store.steampowered.com/app/${id}" target="_blank">${id}</a></span><span class="game-name">${thumb}<span>${name}</span></span><span class="col-cache">${cache}</span><span class="col-update">${ver}</span><span>${actionBtn} <button class="btn btn-d btn-s" data-action="rmApp" data-id="${id}">✕</button></span></div>`;
+    return `<div class="tr" data-appid="${id}"><span class="col-id"><a href="https://store.steampowered.com/app/${id}" target="_blank">${id}</a></span><span class="game-name">${thumb}<span>${esc(name)}</span></span><span class="col-cache">${cache}</span><span class="col-update">${ver}</span><span>${actionBtn} <button class="btn btn-d btn-s" data-action="rmApp" data-id="${id}">✕</button></span></div>`;
   }).join('');
   // Attach event listeners
   el.querySelectorAll('[data-action="prefillOne"]').forEach(btn => btn.addEventListener('click', () => prefillOne(btn, parseInt(btn.dataset.id))));

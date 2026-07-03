@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, progressBar } from '../api.js';
+import { api, progressBar, esc } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { t } from '../i18n/i18n.js';
 import { renderApps, addFromScan } from '../pages/selected.js';
@@ -76,19 +76,19 @@ function updateScanPanel(s) {
   if (s.running) { const pct = s.total > 0 ? Math.round(s.done / s.total * 100) : 0; h = `${progressBar(pct, 'scan')}<div style="color:var(--muted);margin-bottom:8px">${s.status}</div>`; }
   if (discovered.length) {
     h += `<div class="scan-group" style="color:var(--yellow)">${t('progress.discoveredInCache', discovered.length)}</div>`;
-    h += discovered.map(x => `<div class="scan-row scan-row-flex"><span>${x.name}</span><button class="btn btn-g btn-s" data-action="addFromScan" data-id="${x.appId}">+ ${t('actions.add')}</button></div>`).join('');
+    h += discovered.map(x => `<div class="scan-row scan-row-flex"><span>${esc(x.name)}</span><button class="btn btn-g btn-s" data-action="addFromScan" data-id="${x.appId}">+ ${t('actions.add')}</button></div>`).join('');
   }
   if (inCache.length) {
     h += `<div class="scan-group" style="color:var(--green)">${t('progress.selectedCached', inCache.length)}</div>`;
-    h += inCache.map(x => `<div class="scan-row">${x.name}</div>`).join('');
+    h += inCache.map(x => `<div class="scan-row">${esc(x.name)}</div>`).join('');
   }
   if (partial.length) {
     h += `<div class="scan-group" style="color:var(--yellow)">${t('progress.partiallyCached', partial.length)}</div>`;
-    h += partial.map(x => `<div class="scan-row">${x.name}</div>`).join('');
+    h += partial.map(x => `<div class="scan-row">${esc(x.name)}</div>`).join('');
   }
   if (missing.length) {
     h += `<div class="scan-group" style="color:var(--red)">${t('progress.notInCache', missing.length)}</div>`;
-    h += missing.map(x => `<div class="scan-row">${x.name}</div>`).join('');
+    h += missing.map(x => `<div class="scan-row">${esc(x.name)}</div>`).join('');
   }
   body.innerHTML = h || 'No results';
   body.querySelectorAll('[data-action="addFromScan"]').forEach(btn => btn.addEventListener('click', () => addFromScan(parseInt(btn.dataset.id))));

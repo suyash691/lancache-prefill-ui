@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, fmtB, steamThumb } from '../api.js';
+import { api, fmtB, steamThumb, esc } from '../api.js';
 import { t } from '../i18n/i18n.js';
 import { loadApps } from './selected.js';
 
@@ -28,7 +28,7 @@ export function renderCacheBrowser() {
   el.innerHTML = filtered.slice(0, 200).map(g => {
     const size = g.chunkCount > 1000 ? (g.chunkCount / 1000).toFixed(1) + 'K' : g.chunkCount;
     const sel = g.selected, thumb = steamThumb(g.appId);
-    return `<div class="cache-row"><span class="col-id"><a href="https://store.steampowered.com/app/${g.appId}" target="_blank">${g.appId}</a></span><span class="game-name">${thumb}<span>${g.name}${sel ? ` <span class="badge g">${t('badge.selected')}</span>` : ''}</span></span><span class="col-chunks">${size} ${t('cacheBrowser.chunks')}</span><span>${sel ? '' : `<button class="btn btn-g btn-s" data-action="addFromCache" data-id="${g.appId}">+ ${t('actions.add')}</button>`}</span></div>`;
+    return `<div class="cache-row"><span class="col-id"><a href="https://store.steampowered.com/app/${g.appId}" target="_blank">${g.appId}</a></span><span class="game-name">${thumb}<span>${esc(g.name)}${sel ? ` <span class="badge g">${t('badge.selected')}</span>` : ''}</span></span><span class="col-chunks">${size} ${t('cacheBrowser.chunks')}</span><span>${sel ? '' : `<button class="btn btn-g btn-s" data-action="addFromCache" data-id="${g.appId}">+ ${t('actions.add')}</button>`}</span></div>`;
   }).join('') + (filtered.length > 200 ? `<div class="empty">${t('cacheBrowser.remaining', filtered.length - 200)}</div>` : '');
   el.querySelectorAll('[data-action="addFromCache"]').forEach(btn => btn.addEventListener('click', () => addFromCache(parseInt(btn.dataset.id))));
   document.querySelectorAll('.tab')[3].innerHTML = `${t('nav.cacheBrowser')}<span class="tab-count">(${state.cacheGames.length})</span>`;

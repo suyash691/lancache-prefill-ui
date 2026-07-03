@@ -127,13 +127,12 @@ public class AppInfoParserTests
     }
 
     [Fact]
-    public void SkipsUnownedDepots()
+    public void IncludesUnownedDepot_WhenAppIsOwned()
     {
         var kv = BuildAppKv(configureDepots: d => AddDepot(d, "999", 100));
-        // depot 999 not in ownedDepots, app 730 is in ownedApps so it passes the app check
+        // depot 999 not in ownedDepots, but app 730 IS owned → depot is still included
         var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots);
         Assert.NotNull(result);
-        // depot 999 is not owned but app 730 is, so it should still be included
         Assert.Single(result.Depots);
     }
 

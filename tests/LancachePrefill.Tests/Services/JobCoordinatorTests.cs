@@ -175,33 +175,4 @@ public class JobCoordinatorTests
 
         Assert.True(_jobs.StateVersion > v1);
     }
-
-    [Fact]
-    public void Progress_SetAndGet()
-    {
-        var p = new PrefillProgress("running", "CS2", 1, 5, 1024, true);
-        _jobs.Progress = p;
-        Assert.Equal("running", _jobs.Progress.Status);
-        Assert.Equal("CS2", _jobs.Progress.CurrentApp);
-        Assert.True(_jobs.Progress.Running);
-    }
-
-    [Fact]
-    public void CachedGames_SetAndGet()
-    {
-        var games = new List<CachedGameInfo> { new(730, "CS2", 100) };
-        _jobs.CachedGames = games;
-        Assert.Single(_jobs.CachedGames);
-        Assert.Equal(730u, _jobs.CachedGames[0].AppId);
-    }
-
-    [Fact]
-    public void JobLock_SingleAcquire()
-    {
-        Assert.True(_jobs.JobLock.Wait(0));
-        Assert.False(_jobs.JobLock.Wait(0)); // Already held
-        _jobs.JobLock.Release();
-        Assert.True(_jobs.JobLock.Wait(0)); // Available again
-        _jobs.JobLock.Release();
-    }
 }

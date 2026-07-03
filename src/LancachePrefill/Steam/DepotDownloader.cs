@@ -158,8 +158,10 @@ public class DepotDownloader : IDepotDownloader
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
 
+            // IPv6 literals must be bracketed in a URL authority.
+            var hostForUrl = lancacheIp.Contains(':') ? $"[{lancacheIp}]" : lancacheIp;
             using var req = new HttpRequestMessage(HttpMethod.Get,
-                $"http://{lancacheIp}/depot/{chunk.DepotId}/chunk/{chunk.ChunkId}");
+                $"http://{hostForUrl}/depot/{chunk.DepotId}/chunk/{chunk.ChunkId}");
             req.Headers.Host = cdnServer.Host;
 
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);

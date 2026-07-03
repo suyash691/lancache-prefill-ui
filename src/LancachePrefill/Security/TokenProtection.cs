@@ -55,7 +55,7 @@ public static class TokenProtection
         var fullPath = Path.GetFullPath(configDir);
         if (_cachedKey != null && _cachedKeyDir == fullPath) return _cachedKey;
 
-        var identity = GetMachineIdentity() + "|" + fullPath;
+        var identity = GetMachineIdentity(configDir) + "|" + fullPath;
         var salt = Encoding.UTF8.GetBytes("lancache-prefill-v1");
         _cachedKey = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(identity), salt, 100_000, HashAlgorithmName.SHA256, KeySize);
@@ -63,10 +63,44 @@ public static class TokenProtection
         return _cachedKey;
     }
 
-    private static string GetMachineIdentity()
+    private static string GetMachineIdentity(string configDir)
     {
-        if (File.Exists("/etc/machine-id"))
-            return File.ReadAllText("/etc/machine-id").Trim();
-        return Environment.MachineName;
+        // Persist a stable per-install identity in the config volume. This keeps the
+        // derived key constant across container recreation (where /etc/machine-id or
+        // the container hostname can change), which would otherwise render the stored
+        // token undecryptable and force a needless re-login. On first run we seed it
+        // from the legacy identity (machine-id, else hostname) so any token already
+        // encrypted under the old scheme stays decryptable.
+        try
+        {
+            var idFile = Path.Combine(configDir, ".machine-id");
+            if (File.Exists(idFile))
+            {
+                var existing = File.ReadAllText(idFile).Trim();
+                if (!string.IsNullOrEmpty(existing)) return existing;
+            }
+
+            string seed = Environment.MachineName;
+            if (File.Exists("/etc/machine-id"))
+            {
+                var m = File.ReadAllText("/etc/machine-id").Trim();
+                if (!string.IsNullOrEmpty(m)) seed = m;
+            }
+
+            File.WriteAllText(idFile, seed);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(idFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            return seed;
+        }
+        catch
+        {
+            // Fall back to the legacy behavior if the config dir isn't writable.
+            if (File.Exists("/etc/machine-id"))
+            {
+                var m = File.ReadAllText("/etc/machine-id").Trim();
+                if (!string.IsNullOrEmpty(m)) return m;
+            }
+            return Environment.MachineName;
+        }
     }
 }

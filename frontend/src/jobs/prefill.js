@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, fmtB, progressBar } from '../api.js';
+import { api, fmtB, progressBar, esc } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { t } from '../i18n/i18n.js';
 import { loadApps } from '../pages/selected.js';
@@ -38,14 +38,14 @@ function renderAppResults(results) {
     const hasIssues = (r.warnings && r.warnings.length > 0) || (r.errors && r.errors.length > 0);
     
     let html = `<div class="scan-row" style="padding:4px 0">`;
-    html += `<div class="scan-row-flex"><span>${icon} ${r.name}${chunkInfo}${sizeInfo}</span>`;
+    html += `<div class="scan-row-flex"><span>${icon} ${esc(r.name)}${chunkInfo}${sizeInfo}</span>`;
     if (hasIssues) html += `<button class="btn btn-b btn-s prefill-toggle">▼</button>`;
     html += `</div>`;
     
     if (hasIssues) {
       html += `<div style="display:none;padding:4px 0 4px 20px;font-size:11px;color:var(--muted)">`;
-      if (r.errors) r.errors.forEach(e => html += `<div style="color:var(--red)">✕ ${e}</div>`);
-      if (r.warnings) r.warnings.forEach(w => html += `<div style="color:var(--yellow)">⚠ ${w}</div>`);
+      if (r.errors) r.errors.forEach(e => html += `<div style="color:var(--red)">✕ ${esc(e)}</div>`);
+      if (r.warnings) r.warnings.forEach(w => html += `<div style="color:var(--yellow)">⚠ ${esc(w)}</div>`);
       html += `</div>`;
     }
     html += `</div>`;
@@ -124,7 +124,7 @@ export function updatePrefillUI(p) {
       state.syncQueue.forEach(item => {
         const ids = item.appIds || [];
         const name = ids.map(id => state.appNames[id] || `App ${id}`).join(', ');
-        queueHtml += `<div class="scan-row-flex" style="padding:2px 0"><span>${name}</span><button class="btn btn-d btn-s" data-dequeue="${ids[0]}">✕</button></div>`;
+        queueHtml += `<div class="scan-row-flex" style="padding:2px 0"><span>${esc(name)}</span><button class="btn btn-d btn-s" data-dequeue="${ids[0]}">✕</button></div>`;
       });
       queueHtml += '</div>';
     }
@@ -141,7 +141,7 @@ export function updatePrefillUI(p) {
     const queuedNames = state.syncQueue.flatMap(q => (q.appIds || []).map(id => state.appNames[id] || `App ${id}`));
     const allUpNext = [...pendingNames, ...queuedNames];
     if (allUpNext.length > 0) {
-      upNextHtml = `<div style="margin-top:8px;border-top:1px solid var(--primary);padding-top:6px;font-size:12px;color:var(--muted)"><strong>${t('prefill.upNext')}</strong> ${allUpNext.join(', ')}</div>`;
+      upNextHtml = `<div style="margin-top:8px;border-top:1px solid var(--primary);padding-top:6px;font-size:12px;color:var(--muted)"><strong>${t('prefill.upNext')}</strong> ${allUpNext.map(esc).join(', ')}</div>`;
     }
     const resultsHtml = renderAppResults(p.results);
     body.innerHTML = `${progressBar(pct, 'prefill')}<div>${p.done}/${effectiveTotal} ${t('prefill.games')}</div><div>${t('prefill.current')} ${p.currentApp || '—'}</div>${chunkHtml}<div>${t('prefill.transferred')} ${p.bytesTransferred > 0 ? fmtB(p.bytesTransferred) : '—'}</div>${upNextHtml}${resultsHtml}${queueHtml}`;

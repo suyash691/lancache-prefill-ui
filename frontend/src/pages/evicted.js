@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, steamThumb } from '../api.js';
+import { api, steamThumb, esc } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { showConfirm } from '../ui/confirm.js';
 import { updateTabCounts } from '../ui/tabs.js';
@@ -11,12 +11,16 @@ export async function loadEvicted() {
   try {
     const list = await api('/api/evicted');
     state.evictedCount = list.length; state.evictedLoaded = true; updateTabCounts();
-    const el = document.getElementById('evictedRows');
-    if (!list.length) { el.innerHTML = `<div class="empty">${t('evicted.empty')}</div>`; return; }
-    el.innerHTML = list.map(a => `<div class="evict-row"><span class="col-id">${a.appId}</span><span class="game-name">${steamThumb(a.appId)}<span>${a.name}</span></span><span><button class="btn btn-g btn-s" data-action="recache" data-id="${a.appId}">⟳ ${t('actions.recache')}</button> <button class="btn btn-d btn-s" data-action="removeEvicted" data-id="${a.appId}">✕ ${t('actions.remove')}</button></span></div>`).join('');
-    el.querySelectorAll('[data-action="recache"]').forEach(btn => btn.addEventListener('click', () => recacheApp(btn, parseInt(btn.dataset.id))));
-    el.querySelectorAll('[data-action="removeEvicted"]').forEach(btn => btn.addEventListener('click', () => removeEvicted(btn, parseInt(btn.dataset.id))));
+    renderEvicted(list);
   } catch {}
+}
+
+export function renderEvicted(list) {
+  const el = document.getElementById('evictedRows');
+  if (!list.length) { el.innerHTML = `<div class="empty">${t('evicted.empty')}</div>`; return; }
+  el.innerHTML = list.map(a => `<div class="evict-row"><span class="col-id">${a.appId}</span><span class="game-name">${steamThumb(a.appId)}<span>${esc(a.name)}</span></span><span><button class="btn btn-g btn-s" data-action="recache" data-id="${a.appId}">⟳ ${t('actions.recache')}</button> <button class="btn btn-d btn-s" data-action="removeEvicted" data-id="${a.appId}">✕ ${t('actions.remove')}</button></span></div>`).join('');
+  el.querySelectorAll('[data-action="recache"]').forEach(btn => btn.addEventListener('click', () => recacheApp(btn, parseInt(btn.dataset.id))));
+  el.querySelectorAll('[data-action="removeEvicted"]').forEach(btn => btn.addEventListener('click', () => removeEvicted(btn, parseInt(btn.dataset.id))));
 }
 
 async function recacheApp(btn, id) {

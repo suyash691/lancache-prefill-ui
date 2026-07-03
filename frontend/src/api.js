@@ -37,6 +37,13 @@ export async function api(path, opts = {}) {
   return ct && ct.includes('json') ? r.json() : null;
 }
 
+// Escape untrusted text (e.g. Steam-supplied game names, error messages)
+// before interpolating into innerHTML. Prevents DOM XSS.
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 export function fmtB(b) {
   if (b > 1e9) return (b / 1e9).toFixed(1) + ' GB';
   if (b > 1e6) return (b / 1e6).toFixed(1) + ' MB';

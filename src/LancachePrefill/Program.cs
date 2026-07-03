@@ -80,7 +80,7 @@ app.Use(async (ctx, next) =>
     if (path.StartsWith("/api/") && !path.StartsWith("/api/auth/") && !path.StartsWith("/api/lancache") && !path.StartsWith("/api/events"))
     {
         var token = ctx.Request.Headers["X-Session-Token"].FirstOrDefault();
-        if (session.SessionToken == null || token != session.SessionToken)
+        if (!SessionAuth.TokensMatch(session.SessionToken, token))
         {
             ctx.Response.StatusCode = 401;
             return;
@@ -118,3 +118,6 @@ app.Lifetime.ApplicationStopping.Register(() =>
 });
 
 app.Run();
+
+// Exposed so integration tests can host the app via WebApplicationFactory<Program>.
+public partial class Program { }

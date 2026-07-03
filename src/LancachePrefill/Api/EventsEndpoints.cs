@@ -11,7 +11,7 @@ public static class EventsEndpoints
             JobCoordinator jobs, IAppRepository appRepo) =>
         {
             var qToken = ctx.Request.Query["token"].FirstOrDefault();
-            if (session.SessionToken == null || qToken != session.SessionToken)
+            if (!SessionAuth.TokensMatch(session.SessionToken, qToken))
             {
                 ctx.Response.StatusCode = 401;
                 return;

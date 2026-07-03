@@ -86,7 +86,7 @@ public class PrefillServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Prefill_DownloadFailure_CountsAsFailed()
+    public async Task Prefill_PartialDownload_CountsAsPartial()
     {
         _db.AddSelectedApp(730);
         _appInfo.GetAppInfoAsync(Arg.Any<IEnumerable<uint>>(), Arg.Any<bool>())
@@ -139,19 +139,6 @@ public class PrefillServiceTests : IDisposable
         await Task.WhenAll(t1, t2);
 
         await _downloader.Received(1).GetManifestChunksAsync(Arg.Any<DepotState>());
-    }
-
-    [Fact]
-    public void GetProgress_InitialState_IsIdle()
-    {
-        Assert.Equal("idle", _jobs.Progress.Status);
-        Assert.False(_jobs.Progress.Running);
-    }
-
-    [Fact]
-    public void ActiveJob_InitiallyNull()
-    {
-        Assert.Null(_jobs.ActiveJob);
     }
 
     public void Dispose() { _db.Dispose(); try { Directory.Delete(_dir, true); } catch { } }

@@ -16,10 +16,20 @@ public class CacheRepository : ICacheRepository
     public void InsertCacheFiles(IEnumerable<(string hash, uint depotId)> files)
     {
         using var ctx = _factory.CreateDbContext();
-        foreach (var (h, d) in files)
+        using var transaction = ctx.Database.BeginTransaction();
+        try
         {
-            long did = (long)d;
-            ctx.Database.ExecuteSql($"INSERT OR IGNORE INTO cache_files (file_hash, depot_id) VALUES ({h}, {did})");
+            foreach (var (h, d) in files)
+            {
+                long did = (long)d;
+                ctx.Database.ExecuteSql($"INSERT OR IGNORE INTO cache_files (file_hash, depot_id) VALUES ({h}, {did})");
+            }
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
         }
     }
 

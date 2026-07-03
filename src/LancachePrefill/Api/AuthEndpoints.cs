@@ -21,7 +21,7 @@ public static class AuthEndpoints
             });
         });
 
-        group.MapPost("/login", async (LoginRequest req, SteamSession session) =>
+        group.MapPost("/login", async (LoginRequest req, SteamSession session, ILoggerFactory lf) =>
         {
             try
             {
@@ -30,7 +30,7 @@ public static class AuthEndpoints
                     ? Results.Ok(new { success = true, sessionToken = session.SessionToken, steamId = session.SteamId?.ToString() })
                     : Results.Ok(new { success = false, next = result, sessionToken = (string?)null, steamId = (string?)null });
             }
-            catch (Exception ex) { return Results.Problem(ex.Message); }
+            catch (Exception ex) { lf.CreateLogger("Auth").LogError(ex, "Login failed"); return Results.Problem("Login failed"); }
         });
 
         group.MapPost("/logout", (SteamSession session, JobCoordinator jobs) =>
@@ -40,7 +40,7 @@ public static class AuthEndpoints
             return Results.Ok(new { success = true });
         });
 
-        group.MapPost("/auto-login", async (SteamSession session) =>
+        group.MapPost("/auto-login", async (SteamSession session, ILoggerFactory lf) =>
         {
             if (session.SteamId != null) return Results.Ok(new { success = true, sessionToken = session.SessionToken });
             if (!session.HasCredentials) return Results.Ok(new { success = false, sessionToken = (string?)null });
@@ -51,7 +51,7 @@ public static class AuthEndpoints
                     ? Results.Ok(new { success = true, sessionToken = session.SessionToken })
                     : Results.Ok(new { success = false, sessionToken = (string?)null });
             }
-            catch (Exception ex) { return Results.Problem(ex.Message); }
+            catch (Exception ex) { lf.CreateLogger("Auth").LogError(ex, "Auto-login failed"); return Results.Problem("Auto-login failed"); }
         });
 
         return group;

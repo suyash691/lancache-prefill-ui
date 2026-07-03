@@ -11,7 +11,7 @@ public static class AppEndpoints
         var group = app.MapGroup("/api/apps");
 
         group.MapGet("/", async (IAppRepository appRepo, AppInfoProvider? appInfoProvider,
-            SteamSession session, IStringLocalizer<Messages> L) =>
+            SteamSession session, IStringLocalizer<Messages> L, ILoggerFactory lf) =>
         {
             var ids = appRepo.GetSelectedApps();
             if (session.SteamId == null || ids.Count == 0)
@@ -48,7 +48,7 @@ public static class AppEndpoints
                     };
                 }));
             }
-            catch (Exception ex) { return Results.Problem(ex.Message); }
+            catch (Exception ex) { lf.CreateLogger("Apps").LogError(ex, "Failed to load apps"); return Results.Problem("Failed to load apps"); }
         });
 
         group.MapPost("/add", (AddAppRequest req, IAppRepository appRepo, JobCoordinator jobs) =>
@@ -67,7 +67,7 @@ public static class AppEndpoints
         });
 
         group.MapPost("/{appId}/check", async (uint appId, IAppRepository appRepo,
-            AppInfoProvider? appInfoProvider) =>
+            AppInfoProvider? appInfoProvider, ILoggerFactory lf) =>
         {
             try
             {
@@ -78,7 +78,7 @@ public static class AppEndpoints
                 var upToDate = a.Depots.Count > 0 ? appRepo.IsAppUpToDate(a.Depots) : (bool?)null;
                 return Results.Ok(new { appId, upToDate, name = a.Name });
             }
-            catch (Exception ex) { return Results.Problem(ex.Message); }
+            catch (Exception ex) { lf.CreateLogger("Apps").LogError(ex, "Update check failed for {AppId}", appId); return Results.Problem("Update check failed"); }
         });
 
         return group;

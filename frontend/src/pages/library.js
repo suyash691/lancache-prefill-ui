@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, steamThumb } from '../api.js';
+import { api, steamThumb, esc } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { showConfirm } from '../ui/confirm.js';
 import { updateTabCounts } from '../ui/tabs.js';
@@ -24,7 +24,7 @@ export function renderLibrary() {
   const visible = filtered.slice(0, state.libPage * state.libPageSize);
   el.innerHTML = visible.map(a => {
     const sel = a.selected, thumb = steamThumb(a.appId);
-    return `<div class="lib-row${sel ? ' lib-selected' : ''}"><span class="col-id">${a.appId}</span><span class="game-name">${thumb}<span>${a.name}${sel ? ` <span class="badge g">${t('badge.selected')}</span>` : ''}</span></span><span>${sel ? `<button class="btn btn-d btn-s" data-action="toggle" data-id="${a.appId}" data-add="false">${t('actions.remove')}</button>` : `<button class="btn btn-g btn-s" data-action="toggle" data-id="${a.appId}" data-add="true">+ ${t('actions.add')}</button>`}</span></div>`;
+    return `<div class="lib-row${sel ? ' lib-selected' : ''}"><span class="col-id">${a.appId}</span><span class="game-name">${thumb}<span>${esc(a.name)}${sel ? ` <span class="badge g">${t('badge.selected')}</span>` : ''}</span></span><span>${sel ? `<button class="btn btn-d btn-s" data-action="toggle" data-id="${a.appId}" data-add="false">${t('actions.remove')}</button>` : `<button class="btn btn-g btn-s" data-action="toggle" data-id="${a.appId}" data-add="true">+ ${t('actions.add')}</button>`}</span></div>`;
   }).join('');
   el.querySelectorAll('[data-action="toggle"]').forEach(btn => btn.addEventListener('click', () => toggleApp(btn, parseInt(btn.dataset.id), btn.dataset.add === 'true')));
   const remaining = filtered.length - visible.length;

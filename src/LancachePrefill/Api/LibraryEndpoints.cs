@@ -11,7 +11,8 @@ public static class LibraryEndpoints
         var group = app.MapGroup("/api/library");
 
         group.MapGet("/", async (SteamSession session, AppInfoProvider? appInfoProvider,
-            IAppRepository appRepo, CacheBrowserService cacheBrowser, IStringLocalizer<Messages> L) =>
+            IAppRepository appRepo, CacheBrowserService cacheBrowser, IStringLocalizer<Messages> L,
+            ILoggerFactory lf) =>
         {
             if (session.SteamId == null) return Results.Json(new { error = L["Error_NotLoggedIn"].Value }, statusCode: 401);
             try
@@ -26,7 +27,7 @@ public static class LibraryEndpoints
                     selected = selected.Contains(a.AppId)
                 }).OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase));
             }
-            catch (Exception ex) { return Results.Problem(ex.Message); }
+            catch (Exception ex) { lf.CreateLogger("Library").LogError(ex, "Failed to load library"); return Results.Problem("Failed to load library"); }
         });
 
         return group;

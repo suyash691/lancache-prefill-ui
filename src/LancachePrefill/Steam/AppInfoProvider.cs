@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SteamKit2;
 
 namespace LancachePrefill;
@@ -6,7 +7,7 @@ public class AppInfoProvider : IAppInfoProvider
 {
     private readonly ISteamSession _session;
     private readonly ILogger<AppInfoProvider> _log;
-    private readonly Dictionary<uint, AppState> _cache = new();
+    private readonly ConcurrentDictionary<uint, AppState> _cache = new();
     private static readonly HttpClient _http = new();
 
     public AppInfoProvider(ISteamSession session, ILogger<AppInfoProvider> log)
@@ -120,7 +121,7 @@ public class AppInfoProvider : IAppInfoProvider
     }
 
     public void InvalidateCache() => _cache.Clear();
-    public void InvalidateSingle(uint appId) => _cache.Remove(appId);
+    public void InvalidateSingle(uint appId) => _cache.TryRemove(appId, out _);
 
     public static AppState? ParseAppInfo(uint appId, KeyValue kv, HashSet<uint> ownedAppIds, HashSet<uint> ownedDepotIds, bool skipOwnershipCheck = false)
     {
