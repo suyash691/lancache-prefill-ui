@@ -39,6 +39,18 @@ Open `https://<ip>:28542`, log in with Steam, add games, done.
 
 `LANCACHE_CACHE_DIR` (set in `.env`, mounted read-only) enables the Scan and Cache Browser tabs — point it at the monolithic cache data dir (`.../cache/cache`).
 
+### Throughput settings (Settings tab)
+
+| Setting | Default | |
+|----------|---------|---|
+| Prefill Concurrency | `6` | Parallel chunk downloads (1–30) |
+| Prefill Bandwidth Limit | `0` (unlimited) | Global cap in Mbps across all prefill downloads |
+| Scan Concurrency | `4` | Parallel app verifications during scan |
+
+Defaults are deliberately conservative: the lancache is usually serving real clients at the same time. Lancache's nginx runs with `proxy_cache_lock` and `proxy_ignore_client_abort` enabled, so an overly aggressive prefill doesn't just compete for bandwidth — abandoned/timed-out requests keep downloading *inside nginx* while holding per-slice cache locks, which can stall LAN clients (even on cached content, via disk contention) both during and after a prefill run. The downloader therefore uses patient idle-based timeouts instead of aborting slow transfers, and skips chunks that are already on disk (when `LANCACHE_CACHE_DIR` is mounted). If clients still lag while prefill runs, set a bandwidth limit and/or lower the concurrency.
+
+Note: the scheduled scan no longer chains an immediate prefill — evicted apps found by the scan are picked up by the next scheduled prefill instead.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

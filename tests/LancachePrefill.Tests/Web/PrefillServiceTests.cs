@@ -45,7 +45,7 @@ public class PrefillServiceTests : IDisposable
             return new LocalizedString(key, strings.GetValueOrDefault(key, key));
         });
 
-        _service = new PrefillService(_appInfo, _downloader, _db, _db, _jobs,
+        _service = new PrefillService(_appInfo, _downloader, _db, _db, _db, _jobs,
             NullLogger<PrefillService>.Instance, localizer);
     }
 
@@ -77,7 +77,7 @@ public class PrefillServiceTests : IDisposable
         _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
             .Returns(new List<DownloadChunk> { new(731, "AABB", 1024) });
         _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
-            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>())
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>())
             .Returns(new ChunkDownloadResult(1, 0, 1024L, new List<string>()));
 
         await _service.RunPrefillAsync(force: true);
@@ -95,7 +95,7 @@ public class PrefillServiceTests : IDisposable
         _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
             .Returns(new List<DownloadChunk> { new(731, "AABB", 1024) });
         _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
-            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>())
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>())
             .Returns(new ChunkDownloadResult(0, 1, 0L, new List<string> { "HTTP 503" }));
 
         await _service.RunPrefillAsync(force: true);
@@ -113,7 +113,7 @@ public class PrefillServiceTests : IDisposable
         _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
             .Returns(new List<DownloadChunk> { new(731, "AA", 512) });
         _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
-            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>())
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>())
             .Returns(new ChunkDownloadResult(1, 0, 512L, new List<string>()));
 
         await _service.RunPrefillAsync(force: true);
@@ -130,7 +130,7 @@ public class PrefillServiceTests : IDisposable
         _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
             .Returns(new List<DownloadChunk> { new(731, "AA", 1024) });
         _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
-            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>())
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>())
             .Returns(async _ => { await Task.Delay(500); return new ChunkDownloadResult(1, 0, 1024L, new List<string>()); });
 
         var t1 = _service.RunPrefillAsync(force: true);

@@ -157,6 +157,8 @@ public class ScanService
                             currentHashes.Add(Path.GetFileName(file));
                     dirsProcessed++;
                     if (ct.IsCancellationRequested) break;
+                    // Pace the walk — this disk is concurrently serving nginx cache HITs.
+                    await Task.Delay(25, ct);
                     _jobs.ScanJob = new(true, string.Format(_L["Scan_ScanningDirProgress"], dirsProcessed, dirs.Length), dirsProcessed, dirs.Length, []);
                 }
                 if (ct.IsCancellationRequested) { FinishScan(_L["Scan_Cancelled"], []); return; }
@@ -209,6 +211,10 @@ public class ScanService
                                 }
                                 catch { }
                                 readCount++;
+                                // Pace the read storm: on a first run this opens every file in
+                                // the cache — unthrottled it starves nginx HIT reads for clients.
+                                if (readCount % 200 == 0)
+                                    await Task.Delay(50, ct);
                                 if (readCount % 1000 == 0)
                                     _jobs.ScanJob = new(true, string.Format(_L["Scan_ReadingProgress"], readCount.ToString("N0"), newHashes.Count.ToString("N0")), readCount, newHashes.Count, []);
                                 if (readCount % 5000 == 0 && newEntries.Count > 0)

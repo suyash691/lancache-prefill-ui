@@ -51,7 +51,6 @@ public class PrefillScheduler : BackgroundService
 public class ScanScheduler : BackgroundService
 {
     private readonly ScanService _scan;
-    private readonly PrefillService _prefill;
     private readonly JobCoordinator _jobs;
     private readonly SteamSession _session;
     private readonly IAppRepository _appRepo;
@@ -59,12 +58,11 @@ public class ScanScheduler : BackgroundService
     private readonly ILogger<ScanScheduler> _log;
     private readonly Cronos.CronExpression _cron;
 
-    public ScanScheduler(ScanService scan, PrefillService prefill, JobCoordinator jobs,
+    public ScanScheduler(ScanService scan, JobCoordinator jobs,
         SteamSession session, IAppRepository appRepo, ISettingsRepository settings,
         ILogger<ScanScheduler> log)
     {
         _scan = scan;
-        _prefill = prefill;
         _jobs = jobs;
         _session = session;
         _appRepo = appRepo;
@@ -97,18 +95,10 @@ public class ScanScheduler : BackgroundService
             if (_jobs.ActiveJob == null)
             {
                 var scanIds = _session.OwnedAppIds.Union(_appRepo.GetSelectedApps().Select(x => (uint)x));
+                // Note: no prefill is chained here. The scan clears downloaded_depots for
+                // evicted apps, and the separate prefill schedule picks those up — chaining
+                // both back-to-back doubled the I/O load on the cache host.
                 _scan.StartScanJob(scanIds, deep: false);
-                while (_jobs.ActiveJob == "scan" && !ct.IsCancellationRequested)
-                {
-                    try { await Task.Delay(5000, ct); }
-                    catch (TaskCanceledException) { break; }
-                }
-
-                if (!ct.IsCancellationRequested && _session.SteamId != null)
-                {
-                    _log.LogInformation("Running prefill after scheduled scan");
-                    await _prefill.RunPrefillAsync(ct: ct);
-                }
             }
             else
                 _log.LogWarning("Skipping scheduled scan — {Job} still running after preempt", _jobs.ActiveJob);
