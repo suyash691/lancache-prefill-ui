@@ -183,8 +183,10 @@ public class PrefillService
                 }
 
                 // Phase 2: Download chunks with retry
+                // force also acts as verify-and-repair: cached chunks are re-pulled through
+                // the cache and size-validated (mismatches are re-fetched with ?nocache=1).
                 var dlResult = await _downloader.DownloadChunksWithRetryAsync(allChunks,
-                    concurrency: concurrency, maxBytesPerSec: maxBytesPerSec, ct: token,
+                    concurrency: concurrency, maxBytesPerSec: maxBytesPerSec, verifyCached: force, ct: token,
                     progress: new Progress<(long b, int d, int t)>(p =>
                         _jobs.Progress = _jobs.Progress with
                         {

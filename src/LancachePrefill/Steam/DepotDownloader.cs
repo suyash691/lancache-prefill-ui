@@ -106,7 +106,7 @@ public class DepotDownloader : IDepotDownloader
     public async Task<ChunkDownloadResult> DownloadChunksWithRetryAsync(
         List<DownloadChunk> chunks, int concurrency = 6,
         IProgress<(long bytes, int done, int total)>? progress = null,
-        CancellationToken ct = default, long maxBytesPerSec = 0)
+        CancellationToken ct = default, long maxBytesPerSec = 0, bool verifyCached = false)
     {
         var lancacheIp = await DetectLancacheAsync()
             ?? throw new InvalidOperationException("No Lancache detected");
@@ -129,7 +129,9 @@ public class DepotDownloader : IDepotDownloader
                 // Already on disk? Skip the fetch entirely. Re-pulling cache HITs just
                 // hammers the lancache disk while it is serving real clients.
                 // (Only safe for single-slice chunks — the probe checks slice 0.)
-                if (chunk.CompressedLength <= SliceSize && await ProbeChunkCachedAsync(chunk) == true)
+                // verifyCached (force prefill) disables the skip so every chunk is re-pulled
+                // through the cache and size-validated — repairing poisoned entries.
+                if (!verifyCached && chunk.CompressedLength <= SliceSize && await ProbeChunkCachedAsync(chunk) == true)
                 {
                     Interlocked.Increment(ref ok);
                     Interlocked.Increment(ref skippedCached);
@@ -154,10 +156,12 @@ public class DepotDownloader : IDepotDownloader
         if (skippedCached > 0)
             _log.LogInformation("Skipped {Count} already-cached chunks", skippedCached);
 
-        // Pass 2: Retry failed chunks (one at a time, more patient idle timeout)
+        // Pass 2: Retry failed chunks (one at a time, more patient idle timeout).
+        // Retries bypass the cache entry (?nocache=1): if the failure was a size mismatch,
+        // the cache holds junk under this key and the bypass re-fetch overwrites it in place.
         if (failedChunks.Count > 0 && !ct.IsCancellationRequested)
         {
-            _log.LogInformation("Retrying {Count} failed chunks", failedChunks.Count);
+            _log.LogInformation("Retrying {Count} failed chunks (cache-busting)", failedChunks.Count);
             cdnServer = await GetCdnServerAsync(); // may rotate to a healthier server (TTL)
             var stillFailing = new List<(DownloadChunk chunk, string error)>();
 
@@ -165,7 +169,7 @@ public class DepotDownloader : IDepotDownloader
             {
                 if (ct.IsCancellationRequested) break;
                 await Task.Delay(500, ct); // Brief pause before retry
-                var retryError = await TryDownloadChunk(chunk, lancacheIp, cdnServer, ct, idleTimeoutSec: 120);
+                var retryError = await TryDownloadChunk(chunk, lancacheIp, cdnServer, ct, idleTimeoutSec: 120, bustCache: true);
                 if (retryError == null)
                 {
                     Interlocked.Increment(ref ok);
@@ -189,7 +193,7 @@ public class DepotDownloader : IDepotDownloader
         return new ChunkDownloadResult(ok, failed, totalBytes, errors);
     }
 
-    private async Task<string?> TryDownloadChunk(DownloadChunk chunk, string lancacheIp, Server cdnServer, CancellationToken ct, int idleTimeoutSec = 60)
+    private async Task<string?> TryDownloadChunk(DownloadChunk chunk, string lancacheIp, Server cdnServer, CancellationToken ct, int idleTimeoutSec = 60, bool bustCache = false)
     {
         try
         {
@@ -204,14 +208,19 @@ public class DepotDownloader : IDepotDownloader
 
             // IPv6 literals must be bracketed in a URL authority.
             var hostForUrl = lancacheIp.Contains(':') ? $"[{lancacheIp}]" : lancacheIp;
-            using var req = new HttpRequestMessage(HttpMethod.Get,
-                $"http://{hostForUrl}/depot/{chunk.DepotId}/chunk/{chunk.ChunkId}");
+            // ?nocache=1 hits monolithic's `proxy_cache_bypass $arg_nocache`: the response is
+            // re-fetched from upstream and RE-STORED under the same key (the cache key ignores
+            // query args) — this repairs a poisoned/corrupt cache entry in place.
+            var url = $"http://{hostForUrl}/depot/{chunk.DepotId}/chunk/{chunk.ChunkId}"
+                + (bustCache ? "?nocache=1" : "");
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Host = cdnServer.Host;
 
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, overall.Token);
             resp.EnsureSuccessStatusCode();
 
             var buf = new byte[8192];
+            long received = 0;
             using var stream = await resp.Content.ReadAsStreamAsync(overall.Token);
             while (true)
             {
@@ -226,8 +235,17 @@ public class DepotDownloader : IDepotDownloader
                     }
                 }
                 if (n == 0) break;
+                received += n;
                 await _limiter.WaitAsync(n, overall.Token);
             }
+
+            // Integrity check: the manifest tells us the exact on-CDN size of every chunk.
+            // A mismatch means the cache holds junk for this key (e.g. an upstream error page
+            // cached with a 200) — real Steam clients would fail SHA validation on it and
+            // retry-loop at 0 B/s. Returning an error routes this chunk into the retry pass,
+            // which re-fetches with ?nocache=1 and overwrites the bad entry.
+            if (chunk.CompressedLength > 0 && received != chunk.CompressedLength)
+                return $"size mismatch (got {received}, expected {chunk.CompressedLength})";
 
             return null; // Success
         }
