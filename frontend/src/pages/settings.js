@@ -8,6 +8,8 @@ export async function loadSettings() {
     document.getElementById('setPrefillSchedule').value = s.prefill_schedule || '';
     document.getElementById('setScanSchedule').value = s.scan_schedule || '';
     document.getElementById('setScanConcurrency').value = s.scan_concurrency || '4';
+    document.getElementById('setPrefillConcurrency').value = s.prefill_concurrency || '6';
+    document.getElementById('setPrefillMaxMbps').value = s.prefill_max_mbps || '0';
   } catch {}
 }
 
@@ -17,7 +19,9 @@ export async function saveSettings() {
     await api('/api/settings', { method: 'POST', body: JSON.stringify({
       prefill_schedule: document.getElementById('setPrefillSchedule').value,
       scan_schedule: document.getElementById('setScanSchedule').value,
-      scan_concurrency: document.getElementById('setScanConcurrency').value
+      scan_concurrency: document.getElementById('setScanConcurrency').value,
+      prefill_concurrency: document.getElementById('setPrefillConcurrency').value,
+      prefill_max_mbps: document.getElementById('setPrefillMaxMbps').value
     }) });
     const saved = document.getElementById('settingsSaved');
     saved.style.display = 'inline'; setTimeout(() => saved.style.display = 'none', 3000);

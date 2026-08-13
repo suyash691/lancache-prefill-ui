@@ -39,10 +39,23 @@ Open `https://<ip>:28542`, log in with Steam, add games, done.
 
 `LANCACHE_CACHE_DIR` (set in `.env`, mounted read-only) enables the Scan and Cache Browser tabs — point it at the monolithic cache data dir (`.../cache/cache`).
 
+### Throughput settings (Settings tab)
+
+| Setting | Default | |
+|----------|---------|---|
+| Prefill Concurrency | `6` | Parallel chunk downloads (1–30) |
+| Prefill Bandwidth Limit | `0` (unlimited) | Global cap in Mbps across all prefill downloads |
+| Scan Concurrency | `4` | Parallel app verifications during scan |
+
+Defaults are deliberately conservative: the lancache is usually serving real clients at the same time. Lancache's nginx runs with `proxy_cache_lock` and `proxy_ignore_client_abort` enabled, so an overly aggressive prefill doesn't just compete for bandwidth — abandoned/timed-out requests keep downloading *inside nginx* while holding per-slice cache locks, which can stall LAN clients (even on cached content, via disk contention) both during and after a prefill run. The downloader therefore uses patient idle-based timeouts instead of aborting slow transfers, and skips chunks that are already on disk (when `LANCACHE_CACHE_DIR` is mounted). If clients still lag while prefill runs, set a bandwidth limit and/or lower the concurrency.
+
+Note: the scheduled scan no longer chains an immediate prefill — evicted apps found by the scan are picked up by the next scheduled prefill instead.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| **LAN clients stall at 0 B/s on a previously-prefilled game (WAN idle too), works when bypassing the cache** | A poisoned cache entry: an upstream error page got cached with HTTP 200 under a chunk key during prefill. Steam clients read it from disk (no WAN traffic), fail SHA validation, and retry forever. | Run a **Force prefill** for the affected game — force mode re-pulls every chunk through the cache, validates its size against the manifest, and re-fetches mismatches with `?nocache=1`, overwriting the bad entry in place. To confirm poisoning first: `curl -s -A 'Valve/Steam HTTP Client 1.0' -H 'Host: lancache.steamcontent.com' http://<cache-ip>/depot/<id>/chunk/<sha> \| head -c 300` — HTML/text output means the entry is junk. |
 | **Login page shows "No Lancache detected"** / prefill errors immediately | Host DNS isn't pointed at lancache-dns, so `lancache.steamcontent.com` resolves to a public IP | Point the host's resolver at your Lancache and confirm with `nslookup lancache.steamcontent.com` → cache LAN IP. Then restart the container. |
 | **Browser TLS warning on `https://<ip>:28542`** | Self-signed cert generated on first run | Expected — accept the warning. The cert now includes the host's private LAN IPs in its SAN, so the hostname/IP mismatch is minimized; it's still self-signed. |
 | **Prefill succeeds but Scan shows games as "not cached"** | Non-monolithic Lancache, or a monolithic config with a non-default `cacheidentifier`/slice size — the on-disk cache key differs from what the scan expects | Use `lancachenet/monolithic` with defaults. To confirm the key format, inspect a cache file: `grep -rl "KEY: steam/depot/" <cache>/cache \| head` — the scan expects keys of the form `steam/depot/<id>/chunk/<sha>bytes=0-1048575`. |

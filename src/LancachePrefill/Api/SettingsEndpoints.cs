@@ -14,7 +14,9 @@ public static class SettingsEndpoints
             {
                 ["prefill_schedule"] = Environment.GetEnvironmentVariable("PREFILL_SCHEDULE") ?? "0 4 * * *",
                 ["scan_schedule"] = Environment.GetEnvironmentVariable("SCAN_SCHEDULE") ?? "0 3 */3 * *",
-                ["scan_concurrency"] = "4"
+                ["scan_concurrency"] = "4",
+                ["prefill_concurrency"] = "6",
+                ["prefill_max_mbps"] = "0"
             };
             var saved = settingsRepo.GetAllSettings();
             foreach (var (k, v) in saved) defaults[k] = v;
@@ -32,6 +34,16 @@ public static class SettingsEndpoints
                     catch { return Results.Json(new { error = $"Invalid cron expression for {key}: {cron}" }, statusCode: 400); }
                 }
             }
+            // Validate numeric throughput settings
+            foreach (var key in new[] { "prefill_concurrency", "scan_concurrency" })
+            {
+                if (settings.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v)
+                    && (!int.TryParse(v, out var n) || n < 1 || n > 30))
+                    return Results.Json(new { error = $"{key} must be a number between 1 and 30" }, statusCode: 400);
+            }
+            if (settings.TryGetValue("prefill_max_mbps", out var mbps) && !string.IsNullOrWhiteSpace(mbps)
+                && (!long.TryParse(mbps, out var m) || m < 0))
+                return Results.Json(new { error = "prefill_max_mbps must be a non-negative number (0 = unlimited)" }, statusCode: 400);
             foreach (var (k, v) in settings) settingsRepo.SetSetting(k, v);
             return Results.Ok();
         });

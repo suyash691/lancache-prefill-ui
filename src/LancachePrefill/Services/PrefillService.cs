@@ -9,18 +9,20 @@ public class PrefillService
     private readonly IDepotDownloader _downloader;
     private readonly IAppRepository _appRepo;
     private readonly IScanRepository _scanRepo;
+    private readonly ISettingsRepository _settings;
     private readonly JobCoordinator _jobs;
     private readonly ILogger<PrefillService> _log;
     private readonly IStringLocalizer<Messages> _L;
 
     public PrefillService(IAppInfoProvider appInfo, IDepotDownloader downloader,
-        IAppRepository appRepo, IScanRepository scanRepo,
+        IAppRepository appRepo, IScanRepository scanRepo, ISettingsRepository settings,
         JobCoordinator jobs, ILogger<PrefillService> log, IStringLocalizer<Messages> L)
     {
         _appInfo = appInfo;
         _downloader = downloader;
         _appRepo = appRepo;
         _scanRepo = scanRepo;
+        _settings = settings;
         _jobs = jobs;
         _log = log;
         _L = L;
@@ -110,6 +112,13 @@ public class PrefillService
         var processedIds = new HashSet<uint>();
         _jobs.Progress = new("running", null, 0, apps.Count, 0, true, results);
 
+        // Load throughput settings once per run. Conservative defaults: the lancache
+        // is usually serving real clients at the same time.
+        var concurrency = int.TryParse(_settings.GetSetting("prefill_concurrency"), out var pc)
+            ? Math.Clamp(pc, 1, 30) : 6;
+        var maxBytesPerSec = long.TryParse(_settings.GetSetting("prefill_max_mbps"), out var mbps) && mbps > 0
+            ? mbps * 125_000L : 0L; // 1 Mbps = 125,000 bytes/s; 0 = unlimited
+
         // Helper to get pending app names
         List<string> getPending(int fromIndex) => apps.Skip(fromIndex)
             .Where(a => !processedIds.Contains(a.AppId))
@@ -174,7 +183,10 @@ public class PrefillService
                 }
 
                 // Phase 2: Download chunks with retry
-                var dlResult = await _downloader.DownloadChunksWithRetryAsync(allChunks, ct: token,
+                // force also acts as verify-and-repair: cached chunks are re-pulled through
+                // the cache and size-validated (mismatches are re-fetched with ?nocache=1).
+                var dlResult = await _downloader.DownloadChunksWithRetryAsync(allChunks,
+                    concurrency: concurrency, maxBytesPerSec: maxBytesPerSec, verifyCached: force, ct: token,
                     progress: new Progress<(long b, int d, int t)>(p =>
                         _jobs.Progress = _jobs.Progress with
                         {

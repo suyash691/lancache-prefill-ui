@@ -14,13 +14,13 @@ public interface IDepotDownloader
 {
     Task<List<DownloadChunk>> GetManifestChunksAsync(DepotState depot);
     Task<(int ok, int failed, long bytes)> DownloadChunksAsync(
-        List<DownloadChunk> chunks, int concurrency = 30,
+        List<DownloadChunk> chunks, int concurrency = 6,
         IProgress<(long bytes, int done, int total)>? progress = null,
         CancellationToken ct = default);
     Task<ChunkDownloadResult> DownloadChunksWithRetryAsync(
-        List<DownloadChunk> chunks, int concurrency = 30,
+        List<DownloadChunk> chunks, int concurrency = 6,
         IProgress<(long bytes, int done, int total)>? progress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default, long maxBytesPerSec = 0, bool verifyCached = false);
     Task<bool?> ProbeChunkCachedAsync(DownloadChunk chunk);
 }
 
