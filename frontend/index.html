@@ -45,8 +45,28 @@
     <div class="tab" onclick="_app.switchTab('library')">Steam Library</div>
     <div class="tab" onclick="_app.switchTab('evicted')">Evicted</div>
     <div class="tab" onclick="_app.switchTab('cachebrowser')">Cache Browser</div>
+    <div class="tab" onclick="_app.switchTab('activity')">Activity</div>
     <div class="tab" onclick="_app.switchTab('history')">History</div>
     <div class="tab" onclick="_app.switchTab('settings')">Settings</div>
+  </div>
+
+  <div id="tabActivity" style="display:none">
+    <p class="tab-desc">Live cache traffic from the lancache access log — hits served locally vs fetched upstream (last 24h).</p>
+    <div id="activityUnavailable" class="alert-banner alert-warn" style="display:none">
+      Access log not mounted. Set <code>LANCACHE_LOGS_DIR</code> to the lancache <code>logs/</code> directory to enable this view.
+    </div>
+    <div id="activityContent" style="display:none">
+      <div class="activity-cards">
+        <div class="activity-card"><div class="activity-num" id="actHitRatio">—</div><div class="activity-label">Hit ratio</div></div>
+        <div class="activity-card"><div class="activity-num" id="actHitBytes">—</div><div class="activity-label">Served from cache</div></div>
+        <div class="activity-card"><div class="activity-num" id="actMissBytes">—</div><div class="activity-label">Fetched upstream</div></div>
+      </div>
+      <div id="activityChart" class="activity-chart"></div>
+      <div class="tbl" style="margin-top:16px">
+        <div class="th-clients"><span>Client</span><span>Data</span><span>Hit %</span><span>Last seen</span></div>
+        <div id="activityClients"><div class="empty">No traffic observed yet.</div></div>
+      </div>
+    </div>
   </div>
 
   <div id="tabHistory" style="display:none">

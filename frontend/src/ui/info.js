@@ -1,10 +1,24 @@
 import { state } from '../state.js';
-import { timeAgo } from '../api.js';
+import { api, timeAgo, fmtB } from '../api.js';
 import { t } from '../i18n/i18n.js';
 
 export function toggleInfoPopover() {
   const p = document.getElementById('infoPopover');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  const opening = p.style.display === 'none';
+  p.style.display = opening ? 'block' : 'none';
+  if (opening) refreshCacheStats();
+}
+
+async function refreshCacheStats() {
+  try {
+    const s = await api('/api/cache-stats');
+    if (!s.available) return;
+    const used = s.cacheBytes != null ? fmtB(s.cacheBytes) : '?';
+    const free = s.diskFreeBytes != null ? ` · ${fmtB(s.diskFreeBytes)} free` : '';
+    document.getElementById('infoCacheSize').textContent = `${used}${free}`;
+    if (s.scannedAt)
+      document.getElementById('infoCacheSize').title = `Measured by scan ${timeAgo(new Date(s.scannedAt))}`;
+  } catch { /* leave placeholder */ }
 }
 
 export function updateInfoPopover() {

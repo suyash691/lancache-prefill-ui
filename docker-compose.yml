@@ -12,9 +12,12 @@ services:
     volumes:
       - ${CONFIG_DIR:-./config}:/Config
       - ${LANCACHE_CACHE_DIR:-./cache}:/LancacheCache:ro
+      # Mount the lancache 'logs' dir (contains access.log) to enable the Activity view
+      - ${LANCACHE_LOGS_DIR:-./logs}:/LancacheLogs:ro
     environment:
       - CONFIG_DIR=/Config
       - LANCACHE_CACHE_DIR=/LancacheCache
+      - LANCACHE_LOGS_DIR=/LancacheLogs
       - PREFILL_SCHEDULE=${PREFILL_SCHEDULE:-0 4 * * *}
       - SCAN_SCHEDULE=${SCAN_SCHEDULE:-0 3 */3 * *}
       - PORT=${PORT:-28542}

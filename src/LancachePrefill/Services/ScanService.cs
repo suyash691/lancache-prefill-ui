@@ -16,11 +16,13 @@ public class ScanService
     private readonly JobCoordinator _jobs;
     private readonly ILogger<ScanService> _log;
     private readonly IStringLocalizer<Messages> _L;
+    private readonly ISettingsRepository? _settings;
     private CacheBrowserService? _cacheBrowser;
 
     public ScanService(IAppInfoProvider appInfo, IDepotDownloader downloader,
         IAppRepository appRepo, ICacheRepository cacheRepo, IScanRepository scanRepo,
-        JobCoordinator jobs, ILogger<ScanService> log, IStringLocalizer<Messages> L)
+        JobCoordinator jobs, ILogger<ScanService> log, IStringLocalizer<Messages> L,
+        ISettingsRepository? settings = null)
     {
         _appInfo = appInfo;
         _downloader = downloader;
@@ -30,6 +32,7 @@ public class ScanService
         _jobs = jobs;
         _log = log;
         _L = L;
+        _settings = settings;
     }
 
     public void SetCacheBrowser(CacheBrowserService cb) => _cacheBrowser = cb;
@@ -148,13 +151,17 @@ public class ScanService
                 // Phase 1: Walk filesystem
                 _jobs.ScanJob = new(true, _L["Scan_ScanningDir"], 0, 256, []);
                 var currentHashes = new HashSet<string>();
+                long cacheBytes = 0;
                 var dirs = Directory.GetDirectories(cacheDir);
                 int dirsProcessed = 0;
                 foreach (var dir1 in dirs)
                 {
                     foreach (var dir2 in Directory.EnumerateDirectories(dir1))
                         foreach (var file in Directory.EnumerateFiles(dir2))
+                        {
                             currentHashes.Add(Path.GetFileName(file));
+                            try { cacheBytes += new FileInfo(file).Length; } catch { /* file vanished mid-walk */ }
+                        }
                     dirsProcessed++;
                     if (ct.IsCancellationRequested) break;
                     // Pace the walk — this disk is concurrently serving nginx cache HITs.
@@ -162,6 +169,15 @@ public class ScanService
                     _jobs.ScanJob = new(true, string.Format(_L["Scan_ScanningDirProgress"], dirsProcessed, dirs.Length), dirsProcessed, dirs.Length, []);
                 }
                 if (ct.IsCancellationRequested) { FinishScan(_L["Scan_Cancelled"], []); return; }
+
+                // Persist cache usage for /api/cache-stats (internal stat_ keys are
+                // not writable through the settings endpoint and hidden from its GET).
+                try
+                {
+                    _settings?.SetSetting("stat_cache_bytes", cacheBytes.ToString());
+                    _settings?.SetSetting("stat_cache_scanned_at", DateTime.UtcNow.ToString("O"));
+                }
+                catch (Exception ex) { _log.LogWarning(ex, "Failed to persist cache stats"); }
 
                 // Phase 2: Diff
                 if (deep) _scanRepo.SaveScanResults([]);

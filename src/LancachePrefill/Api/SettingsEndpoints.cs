@@ -32,7 +32,9 @@ public static class SettingsEndpoints
                 ["prefill_languages"] = ""
             };
             var saved = settingsRepo.GetAllSettings();
-            foreach (var (k, v) in saved) defaults[k] = v;
+            foreach (var (k, v) in saved)
+                if (!k.StartsWith("stat_")) // internal scan-written stats live in /api/cache-stats
+                    defaults[k] = v;
             return Results.Ok(defaults);
         });
 

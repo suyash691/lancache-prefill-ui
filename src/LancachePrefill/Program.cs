@@ -43,6 +43,8 @@ builder.Services.AddSingleton<SseTicketStore>();
 builder.Services.AddSingleton<ScanService>();
 builder.Services.AddSingleton<PrefillService>();
 builder.Services.AddSingleton<CacheBrowserService>();
+builder.Services.AddSingleton<ActivityTracker>();
+builder.Services.AddHostedService<AccessLogTailService>();
 builder.Services.AddHostedService<PrefillScheduler>();
 builder.Services.AddHostedService<ScanScheduler>();
 
@@ -118,6 +120,8 @@ app.MapEvictedEndpoints();
 app.MapCacheBrowserEndpoints();
 app.MapSettingsEndpoints();
 app.MapHistoryEndpoints();
+app.MapCacheStatsEndpoints();
+app.MapActivityEndpoints();
 app.MapEventsEndpoint();
 
 app.Lifetime.ApplicationStopping.Register(() =>
