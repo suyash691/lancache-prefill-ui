@@ -30,6 +30,7 @@ public static class EventsEndpoints
                 { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
             HashSet<uint>? cachedSelected = null;
             int lastVersion = -1;
+            string? lastPayload = null;
             while (!ct.IsCancellationRequested)
             {
                 try
@@ -58,7 +59,17 @@ public static class EventsEndpoints
                             }).ToList()
                         }
                     }, jsonOpts);
-                    await ctx.Response.WriteAsync($"data: {data}\n\n", ct);
+                    if (data != lastPayload)
+                    {
+                        await ctx.Response.WriteAsync($"data: {data}\n\n", ct);
+                        lastPayload = data;
+                    }
+                    else
+                    {
+                        // Nothing changed — send an SSE comment as a keepalive instead
+                        // of making every client re-parse an identical payload.
+                        await ctx.Response.WriteAsync(": keepalive\n\n", ct);
+                    }
                     await ctx.Response.Body.FlushAsync(ct);
                 }
                 catch (Exception) when (!ct.IsCancellationRequested) { }

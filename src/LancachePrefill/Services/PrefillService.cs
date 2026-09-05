@@ -38,6 +38,16 @@ public class PrefillService
             _jobs.PrefillCts = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
             _ = Task.Run(RunQueuedPrefillAsync);
         }
+        else if (_jobs.ActiveJob != "prefill")
+        {
+            // Lost a race: a scan grabbed the lock between the ActiveJob check and
+            // Wait(0). Nothing drains the queue while a scan runs, so undo the
+            // enqueue and report busy instead of leaving an orphaned queue entry.
+            // (If a finishing prefill picked the item up in this window, removing
+            // it is a no-op.)
+            foreach (var id in appIds) _jobs.DequeueSync(id);
+            return false;
+        }
         return true;
     }
 

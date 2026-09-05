@@ -37,6 +37,7 @@ public sealed class SteamSession : ISteamSession, IDisposable
     private SteamUser.LoggedOnCallback? _logonResult;
     private int _loginAttempts;
     private DateTime _lastLoginAttempt = DateTime.MinValue;
+    private DateTime _lastTokenLoginAttempt = DateTime.MinValue;
     private readonly SemaphoreSlim _loginLock = new(1, 1);
 
     private string TokenPath => Path.Combine(_configDir, "token.enc");
@@ -101,12 +102,25 @@ public sealed class SteamSession : ISteamSession, IDisposable
             return null;
         }
 
-        if (_loginAttempts >= 5 && DateTime.UtcNow - _lastLoginAttempt < TimeSpan.FromMinutes(5))
-            return "too_many_attempts";
-        if (DateTime.UtcNow - _lastLoginAttempt >= TimeSpan.FromMinutes(5))
-            _loginAttempts = 0;
-        _loginAttempts++;
-        _lastLoginAttempt = DateTime.UtcNow;
+        if (username != null)
+        {
+            // The lockout guards password guessing — only credential logins count.
+            if (_loginAttempts >= 5 && DateTime.UtcNow - _lastLoginAttempt < TimeSpan.FromMinutes(5))
+                return "too_many_attempts";
+            if (DateTime.UtcNow - _lastLoginAttempt >= TimeSpan.FromMinutes(5))
+                _loginAttempts = 0;
+            _loginAttempts++;
+            _lastLoginAttempt = DateTime.UtcNow;
+        }
+        else
+        {
+            // Stored-token re-logins aren't guessable, so they must not consume the
+            // lockout budget (an attacker spamming bad passwords would otherwise
+            // lock out auto-login too). Just bound how often we hit Steam.
+            if (DateTime.UtcNow - _lastTokenLoginAttempt < TimeSpan.FromSeconds(10))
+                return "too_many_attempts";
+            _lastTokenLoginAttempt = DateTime.UtcNow;
+        }
 
         InitClient();
 
