@@ -27,6 +27,7 @@ builder.Services.AddSingleton<IAppRepository>(sp => new AppRepository(sp.GetRequ
 builder.Services.AddSingleton<ICacheRepository>(sp => new CacheRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 builder.Services.AddSingleton<IScanRepository>(sp => new ScanRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 builder.Services.AddSingleton<ISettingsRepository>(sp => new SettingsRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
+builder.Services.AddSingleton<IRunHistoryRepository>(sp => new RunHistoryRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 
 // Steam
 builder.Services.AddSingleton(sp => new SteamSession(configDir, sp.GetRequiredService<ILogger<SteamSession>>()));
@@ -116,6 +117,7 @@ app.MapPrefillEndpoints();
 app.MapEvictedEndpoints();
 app.MapCacheBrowserEndpoints();
 app.MapSettingsEndpoints();
+app.MapHistoryEndpoints();
 app.MapEventsEndpoint();
 
 app.Lifetime.ApplicationStopping.Register(() =>

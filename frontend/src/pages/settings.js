@@ -10,18 +10,30 @@ export async function loadSettings() {
     document.getElementById('setScanConcurrency').value = s.scan_concurrency || '4';
     document.getElementById('setPrefillConcurrency').value = s.prefill_concurrency || '6';
     document.getElementById('setPrefillMaxMbps').value = s.prefill_max_mbps || '0';
+    const oses = (s.prefill_os_filter || 'windows').split(',').map(o => o.trim().toLowerCase());
+    document.getElementById('setOsWindows').checked = oses.includes('windows');
+    document.getElementById('setOsLinux').checked = oses.includes('linux');
+    document.getElementById('setOsMacos').checked = oses.includes('macos');
+    document.getElementById('setLanguages').value = s.prefill_languages || '';
   } catch {}
 }
 
 export async function saveSettings() {
   const btn = document.querySelector('#tabSettings .btn'); btn.classList.add('btn-loading');
   try {
+    const oses = [
+      document.getElementById('setOsWindows').checked ? 'windows' : null,
+      document.getElementById('setOsLinux').checked ? 'linux' : null,
+      document.getElementById('setOsMacos').checked ? 'macos' : null,
+    ].filter(Boolean);
     await api('/api/settings', { method: 'POST', body: JSON.stringify({
       prefill_schedule: document.getElementById('setPrefillSchedule').value,
       scan_schedule: document.getElementById('setScanSchedule').value,
       scan_concurrency: document.getElementById('setScanConcurrency').value,
       prefill_concurrency: document.getElementById('setPrefillConcurrency').value,
-      prefill_max_mbps: document.getElementById('setPrefillMaxMbps').value
+      prefill_max_mbps: document.getElementById('setPrefillMaxMbps').value,
+      prefill_os_filter: oses.length ? oses.join(',') : 'windows', // never zero platforms
+      prefill_languages: document.getElementById('setLanguages').value
     }) });
     const saved = document.getElementById('settingsSaved');
     saved.style.display = 'inline'; setTimeout(() => saved.style.display = 'none', 3000);

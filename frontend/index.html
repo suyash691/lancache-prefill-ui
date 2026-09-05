@@ -45,7 +45,16 @@
     <div class="tab" onclick="_app.switchTab('library')">Steam Library</div>
     <div class="tab" onclick="_app.switchTab('evicted')">Evicted</div>
     <div class="tab" onclick="_app.switchTab('cachebrowser')">Cache Browser</div>
+    <div class="tab" onclick="_app.switchTab('history')">History</div>
     <div class="tab" onclick="_app.switchTab('settings')">Settings</div>
+  </div>
+
+  <div id="tabHistory" style="display:none">
+    <p class="tab-desc">Past prefill runs — what ran, when, and how much data moved.</p>
+    <div class="tbl">
+      <div class="th-history"><span>Started</span><span>Trigger</span><span>Duration</span><span>Apps</span><span>Data</span><span>Status</span></div>
+      <div id="historyRows"><div class="empty">No prefill runs recorded yet.</div></div>
+    </div>
   </div>
 
   <div id="tabSelected">
@@ -71,6 +80,8 @@
     <div class="lib-toolbar">
       <input class="search" id="libSearch" placeholder="Search your Steam library..." oninput="_app.filterLibrary()" style="flex:1;margin-bottom:0">
       <button class="btn btn-g btn-s" onclick="_app.selectFiltered()">+ Add Filtered</button>
+      <button class="btn btn-b btn-s" onclick="_app.openTopGames()" title="Most played games on Steam right now">★ Top Games</button>
+      <button class="btn btn-b btn-s" onclick="_app.addRecentPurchases()" title="Add games from licenses granted in the last 14 days">🛒 Recent Purchases</button>
     </div>
     <div class="tbl">
       <div class="th-lib"><span class="col-id">ID</span><span>Name</span><span></span></div>
@@ -121,6 +132,18 @@
         <label>Prefill Bandwidth Limit (Mbps, 0 = unlimited)</label>
         <input class="search" id="setPrefillMaxMbps" type="number" min="0" style="margin-bottom:0;width:110px" placeholder="0">
       </div>
+      <div class="setting-row">
+        <label>Depot Platforms (which OS depots to download)</label>
+        <div style="display:flex;gap:16px;align-items:center">
+          <label style="font-weight:normal"><input type="checkbox" id="setOsWindows" checked> Windows</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsLinux"> Linux</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsMacos"> macOS</label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Depot Languages (comma list, e.g. english,german — empty = all)</label>
+        <input class="search" id="setLanguages" style="margin-bottom:0" placeholder="all languages">
+      </div>
       <button class="btn btn-a" onclick="_app.saveSettings()">💾 Save</button>
       <span id="settingsSaved" style="color:var(--green);font-size:13px;margin-left:12px;display:none">✓ Saved</span>
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--primary)">
@@ -145,6 +168,18 @@
 <div id="scanPanel" class="panel" style="display:none">
   <div class="panel-header"><strong>Lancache Scan</strong><span class="panel-close" onclick="document.getElementById('scanPanel').style.display='none'">×</span></div>
   <div id="scanPanelBody" class="panel-body"></div>
+</div>
+
+<div class="overlay" id="quickAddDialog" style="display:none">
+  <div class="dialog" style="width:420px;max-height:70vh;display:flex;flex-direction:column">
+    <h2 id="quickAddTitle">★ Top Games</h2>
+    <p class="dialog-desc" id="quickAddDesc"></p>
+    <div id="quickAddRows" style="overflow-y:auto;text-align:left;flex:1"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-g dialog-btn" id="quickAddOwnedBtn" onclick="_app.quickAddAllOwned()">+ Add All Owned</button>
+      <span class="link" onclick="document.getElementById('quickAddDialog').style.display='none'">Close</span>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="scanDialog" style="display:none">

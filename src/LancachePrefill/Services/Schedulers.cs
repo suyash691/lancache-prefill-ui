@@ -91,7 +91,7 @@ public class PrefillScheduler : BackgroundService
                     await Task.Delay(10_000, ct);
                 if (ct.IsCancellationRequested) break;
                 if (_jobs.ActiveJob == null)
-                    await _prefill.RunPrefillAsync(ct: ct);
+                    await _prefill.RunPrefillAsync(ct: ct, trigger: "scheduled");
                 else
                     _log.LogWarning("Skipping scheduled prefill — {Job} is running", _jobs.ActiveJob);
             }

@@ -7,14 +7,33 @@ public class AppInfoProvider : IAppInfoProvider
 {
     private readonly ISteamSession _session;
     private readonly ILogger<AppInfoProvider> _log;
+    private readonly Data.Repositories.ISettingsRepository? _settings;
     private readonly ConcurrentDictionary<uint, AppState> _cache = new();
     private static readonly HttpClient _http = new();
 
-    public AppInfoProvider(ISteamSession session, ILogger<AppInfoProvider> log)
+    public AppInfoProvider(ISteamSession session, ILogger<AppInfoProvider> log,
+        Data.Repositories.ISettingsRepository? settings = null)
     {
         _session = session;
         _log = log;
+        _settings = settings;
     }
+
+    /// <summary>Effective depot OS filter: settings csv, falling back to windows-only.</summary>
+    private IReadOnlySet<string> OsFilter()
+    {
+        var csv = _settings?.GetSetting("prefill_os_filter");
+        var set = ParseCsv(csv);
+        return set is { Count: > 0 } ? set : new HashSet<string> { "windows" };
+    }
+
+    /// <summary>Effective depot language filter: settings csv; null/empty = all languages.</summary>
+    private IReadOnlySet<string>? LanguageFilter() => ParseCsv(_settings?.GetSetting("prefill_languages"));
+
+    private static HashSet<string>? ParseCsv(string? csv) =>
+        string.IsNullOrWhiteSpace(csv) ? null
+            : csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Select(t => t.ToLowerInvariant()).ToHashSet();
 
     public async Task<List<AppState>> GetAppInfoAsync(IEnumerable<uint> appIds, bool skipOwnershipCheck = false)
     {
@@ -41,11 +60,14 @@ public class AppInfoProvider : IAppInfoProvider
 
                         var result = await _session.SteamApps.PICSGetProductInfo(requests, []).ToTask();
                         var returnedIds = new HashSet<uint>();
+                        var osFilter = OsFilter();
+                        var langFilter = LanguageFilter();
                         if (result.Results != null)
                             foreach (var app in result.Results.SelectMany(r => r.Apps).Select(a => a.Value))
                             {
                                 returnedIds.Add(app.ID);
-                                var state = ParseAppInfo(app.ID, app.KeyValues, _session.OwnedAppIds, _session.OwnedDepotIds, skipOwnershipCheck);
+                                var state = ParseAppInfo(app.ID, app.KeyValues, _session.OwnedAppIds, _session.OwnedDepotIds,
+                                    skipOwnershipCheck, osFilter, langFilter);
                                 if (state != null) _cache[app.ID] = state;
                             }
 
@@ -123,8 +145,18 @@ public class AppInfoProvider : IAppInfoProvider
     public void InvalidateCache() => _cache.Clear();
     public void InvalidateSingle(uint appId) => _cache.TryRemove(appId, out _);
 
-    public static AppState? ParseAppInfo(uint appId, KeyValue kv, HashSet<uint> ownedAppIds, HashSet<uint> ownedDepotIds, bool skipOwnershipCheck = false)
+    /// <summary>
+    /// Parses PICS appinfo into an AppState.
+    /// osFilter: depots whose config/oslist matches none of these are skipped.
+    ///   null = default {"windows"}; empty set = include all OSes.
+    /// languageFilter: depots whose config/language matches none of these are skipped.
+    ///   null or empty = include all languages. Depots with no language are always included.
+    /// </summary>
+    public static AppState? ParseAppInfo(uint appId, KeyValue kv, HashSet<uint> ownedAppIds, HashSet<uint> ownedDepotIds,
+        bool skipOwnershipCheck = false, IReadOnlySet<string>? osFilter = null, IReadOnlySet<string>? languageFilter = null)
     {
+        osFilter ??= DefaultOsFilter;
+
         var name = kv["common"]["name"].Value;
         var type = kv["common"]["type"].Value?.ToLowerInvariant();
         if (type is not ("game" or "beta")) return null;
@@ -148,16 +180,34 @@ public class AppInfoProvider : IAppInfoProvider
                 var dlcAppId = depotKv["dlcappid"].AsUnsignedInteger();
                 if (!skipOwnershipCheck && dlcAppId != 0 && !ownedAppIds.Contains(dlcAppId)) continue;
 
+                // OS filter: oslist is comma-separated (e.g. "windows,macos"); absent = all platforms.
                 var osList = depotKv["config"]["oslist"].Value;
-                if (osList != null && !osList.Contains("windows")) continue;
+                if (osFilter.Count > 0 && osList != null
+                    && !SplitTokens(osList).Any(osFilter.Contains)) continue;
+
+                // Language filter: config/language marks language-specific depots (e.g. "german").
+                // Absent = universal content, always included.
+                var language = depotKv["config"]["language"].Value;
+                if (languageFilter is { Count: > 0 } && !string.IsNullOrEmpty(language)
+                    && !SplitTokens(language).Any(languageFilter.Contains)) continue;
 
                 var containingAppId = depotKv["dlcappid"].AsUnsignedInteger();
                 if (containingAppId == 0) containingAppId = depotKv["depotfromapp"].AsUnsignedInteger();
                 if (containingAppId == 0) containingAppId = appId;
 
-                depots.Add(new DepotState(depotId, depotKv["name"].Value, manifestId, appId, containingAppId));
+                // Compressed download size straight from appinfo — powers size
+                // estimates without any manifest fetches.
+                var downloadSize = (long)depotKv["manifests"]["public"]["download"].AsUnsignedLong();
+
+                depots.Add(new DepotState(depotId, depotKv["name"].Value, manifestId, appId, containingAppId, downloadSize));
             }
 
         return new AppState(appId, name ?? $"App {appId}", depots);
     }
+
+    private static readonly IReadOnlySet<string> DefaultOsFilter = new HashSet<string> { "windows" };
+
+    private static IEnumerable<string> SplitTokens(string csv) =>
+        csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+           .Select(t => t.ToLowerInvariant());
 }

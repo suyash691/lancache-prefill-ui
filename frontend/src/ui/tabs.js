@@ -3,7 +3,7 @@ import { t } from '../i18n/i18n.js';
 import { loadLibrary } from '../pages/library.js';
 
 export function switchTab(tab) {
-  ['selected', 'library', 'evicted', 'cachebrowser', 'settings'].forEach((name, i) => {
+  ['selected', 'library', 'evicted', 'cachebrowser', 'history', 'settings'].forEach((name, i) => {
     document.querySelectorAll('.tab')[i].classList.toggle('active', name === tab);
     document.getElementById('tab' + name[0].toUpperCase() + name.slice(1)).style.display = name === tab ? 'block' : 'none';
   });
@@ -16,6 +16,9 @@ export function switchTab(tab) {
   }
   if (tab === 'cachebrowser') {
     import('../pages/cache-browser.js').then(m => m.loadCacheBrowser());
+  }
+  if (tab === 'history') {
+    import('../pages/history.js').then(m => m.loadHistory());
   }
   if (tab === 'settings') {
     import('../pages/settings.js').then(m => m.loadSettings());

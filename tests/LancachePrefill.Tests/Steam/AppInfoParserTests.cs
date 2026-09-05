@@ -28,7 +28,7 @@ public class AppInfoParserTests
     }
 
     private static void AddDepot(KeyValue depots, string depotId, ulong manifestId,
-        string? oslist = null, string? depotFromApp = null)
+        string? oslist = null, string? depotFromApp = null, string? language = null, ulong downloadSize = 0)
     {
         var depot = new KeyValue(depotId);
         depot.Children.Add(new KeyValue("name") { Value = $"Depot {depotId}" });
@@ -36,14 +36,18 @@ public class AppInfoParserTests
         var manifests = new KeyValue("manifests");
         var pub = new KeyValue("public");
         pub.Children.Add(new KeyValue("gid") { Value = manifestId.ToString() });
+        if (downloadSize > 0)
+            pub.Children.Add(new KeyValue("download") { Value = downloadSize.ToString() });
         manifests.Children.Add(pub);
         depot.Children.Add(manifests);
 
-        if (oslist != null || depotFromApp != null)
+        if (oslist != null || language != null || depotFromApp != null)
         {
             var config = new KeyValue("config");
             if (oslist != null)
                 config.Children.Add(new KeyValue("oslist") { Value = oslist });
+            if (language != null)
+                config.Children.Add(new KeyValue("language") { Value = language });
             depot.Children.Add(config);
         }
 
@@ -107,6 +111,82 @@ public class AppInfoParserTests
         Assert.NotNull(result);
         Assert.Single(result.Depots);
         Assert.Equal(732u, result.Depots[0].DepotId);
+    }
+
+    [Fact]
+    public void OsFilter_Linux_IncludesLinuxDepots()
+    {
+        var kv = BuildAppKv(configureDepots: d =>
+        {
+            AddDepot(d, "731", 100, oslist: "linux");
+            AddDepot(d, "732", 200, oslist: "windows");
+        });
+
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots,
+            osFilter: new HashSet<string> { "linux" });
+        Assert.Single(result!.Depots);
+        Assert.Equal(731u, result.Depots[0].DepotId);
+    }
+
+    [Fact]
+    public void OsFilter_Empty_IncludesAllPlatforms()
+    {
+        var kv = BuildAppKv(configureDepots: d =>
+        {
+            AddDepot(d, "731", 100, oslist: "linux");
+            AddDepot(d, "732", 200, oslist: "windows");
+            AddDepot(d, "733", 300, oslist: "macos");
+        });
+
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots,
+            osFilter: new HashSet<string>());
+        Assert.Equal(3, result!.Depots.Count);
+    }
+
+    [Fact]
+    public void OsFilter_MatchesAnyTokenInCommaList()
+    {
+        var kv = BuildAppKv(configureDepots: d => AddDepot(d, "731", 100, oslist: "windows,macos"));
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots,
+            osFilter: new HashSet<string> { "macos" });
+        Assert.Single(result!.Depots);
+    }
+
+    [Fact]
+    public void LanguageFilter_ExcludesOtherLanguages_KeepsUniversal()
+    {
+        var kv = BuildAppKv(configureDepots: d =>
+        {
+            AddDepot(d, "731", 100);                       // universal (no language)
+            AddDepot(d, "732", 200, language: "german");
+            AddDepot(d, "733", 300, language: "english");
+        });
+
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots,
+            languageFilter: new HashSet<string> { "english" });
+        Assert.Equal(2, result!.Depots.Count);
+        Assert.DoesNotContain(result.Depots, dep => dep.DepotId == 732);
+    }
+
+    [Fact]
+    public void NoLanguageFilter_IncludesAllLanguages()
+    {
+        var kv = BuildAppKv(configureDepots: d =>
+        {
+            AddDepot(d, "732", 200, language: "german");
+            AddDepot(d, "733", 300, language: "english");
+        });
+
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots);
+        Assert.Equal(2, result!.Depots.Count);
+    }
+
+    [Fact]
+    public void ParsesDownloadSize()
+    {
+        var kv = BuildAppKv(configureDepots: d => AddDepot(d, "731", 100, downloadSize: 123_456_789));
+        var result = AppInfoProvider.ParseAppInfo(730, kv, _ownedApps, _ownedDepots);
+        Assert.Equal(123_456_789L, result!.Depots[0].DownloadSize);
     }
 
     [Fact]
