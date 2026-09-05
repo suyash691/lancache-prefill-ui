@@ -88,7 +88,9 @@ public class PrefillService
             else
                 foreach (var id in specificAppIds) _appInfo.InvalidateSingle(id);
 
-            var appIds = specificAppIds ?? _appRepo.GetActiveApps();
+            // Include evicted apps: the scheduled scan clears their downloaded_depots
+            // precisely so the next full prefill re-downloads them.
+            var appIds = specificAppIds ?? _appRepo.GetAppsByStatus("active", "partial", "evicted");
             var apps = await _appInfo.GetAppInfoAsync(appIds, skipOwnershipCheck: true);
             await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts.Token);
         }
