@@ -12,6 +12,7 @@ public class PrefillDbContext : DbContext
     public DbSet<CacheFile> CacheFiles => Set<CacheFile>();
     public DbSet<ScanResultEntity> ScanResults => Set<ScanResultEntity>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<PrefillRun> PrefillRuns => Set<PrefillRun>();
 
     public PrefillDbContext(DbContextOptions<PrefillDbContext> options) : base(options) { }
 

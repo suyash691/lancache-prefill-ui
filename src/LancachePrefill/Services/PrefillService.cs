@@ -10,19 +10,22 @@ public class PrefillService
     private readonly IAppRepository _appRepo;
     private readonly IScanRepository _scanRepo;
     private readonly ISettingsRepository _settings;
+    private readonly IRunHistoryRepository? _history;
     private readonly JobCoordinator _jobs;
     private readonly ILogger<PrefillService> _log;
     private readonly IStringLocalizer<Messages> _L;
 
     public PrefillService(IAppInfoProvider appInfo, IDepotDownloader downloader,
         IAppRepository appRepo, IScanRepository scanRepo, ISettingsRepository settings,
-        JobCoordinator jobs, ILogger<PrefillService> log, IStringLocalizer<Messages> L)
+        JobCoordinator jobs, ILogger<PrefillService> log, IStringLocalizer<Messages> L,
+        IRunHistoryRepository? history = null)
     {
         _appInfo = appInfo;
         _downloader = downloader;
         _appRepo = appRepo;
         _scanRepo = scanRepo;
         _settings = settings;
+        _history = history;
         _jobs = jobs;
         _log = log;
         _L = L;
@@ -63,7 +66,7 @@ public class PrefillService
             foreach (var id in queuedIds) _appInfo.InvalidateSingle(id);
 
             var apps = await _appInfo.GetAppInfoAsync(queuedIds, skipOwnershipCheck: true);
-            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token);
+            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token, "queued");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log.LogError(ex, "Prefill queue failed"); }
@@ -86,7 +89,7 @@ public class PrefillService
     }
 
     public async Task RunPrefillAsync(bool force = false, List<uint>? specificAppIds = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string trigger = "manual")
     {
         if (!_jobs.JobLock.Wait(0)) return;
         _jobs.PrefillCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -102,7 +105,7 @@ public class PrefillService
             // precisely so the next full prefill re-downloads them.
             var appIds = specificAppIds ?? _appRepo.GetAppsByStatus("active", "partial", "evicted");
             var apps = await _appInfo.GetAppInfoAsync(appIds, skipOwnershipCheck: true);
-            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts.Token);
+            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts.Token, trigger);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log.LogError(ex, "Prefill failed"); }
@@ -116,8 +119,10 @@ public class PrefillService
         }
     }
 
-    private async Task RunPrefillInternalAsync(bool force, List<AppState> apps, CancellationToken token)
+    private async Task RunPrefillInternalAsync(bool force, List<AppState> apps, CancellationToken token,
+        string trigger = "manual")
     {
+        var startedAt = DateTime.UtcNow;
         int done = 0, cached = 0, partial = 0, skipped = 0, failed = 0;
         long totalBytes = 0;
         var results = new List<AppPrefillResult>();
@@ -293,5 +298,25 @@ public class PrefillService
             ? string.Format(_L["Prefill_Cancelled"], cached, skipped, failed)
             : $"done: {cached} cached, {partial} partial, {skipped} current, {failed} failed";
         _jobs.Progress = new(msg, null, done, apps.Count, totalBytes, false, results);
+
+        // Record the run in history (best effort — never fail the run over it).
+        try
+        {
+            _history?.AddRun(new Data.Entities.PrefillRun
+            {
+                StartedAt = startedAt,
+                FinishedAt = DateTime.UtcNow,
+                Trigger = trigger,
+                Status = token.IsCancellationRequested ? "cancelled" : "done",
+                AppsCached = cached,
+                AppsPartial = partial,
+                AppsSkipped = skipped,
+                AppsFailed = failed,
+                Bytes = totalBytes,
+                ResultsJson = System.Text.Json.JsonSerializer.Serialize(
+                    results.Select(r => new { appId = r.AppId, name = r.Name, status = r.Status, bytes = r.Bytes }))
+            });
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Failed to record prefill run history"); }
     }
 }

@@ -45,7 +45,16 @@
     <div class="tab" onclick="_app.switchTab('library')">Steam Library</div>
     <div class="tab" onclick="_app.switchTab('evicted')">Evicted</div>
     <div class="tab" onclick="_app.switchTab('cachebrowser')">Cache Browser</div>
+    <div class="tab" onclick="_app.switchTab('history')">History</div>
     <div class="tab" onclick="_app.switchTab('settings')">Settings</div>
+  </div>
+
+  <div id="tabHistory" style="display:none">
+    <p class="tab-desc">Past prefill runs — what ran, when, and how much data moved.</p>
+    <div class="tbl">
+      <div class="th-history"><span>Started</span><span>Trigger</span><span>Duration</span><span>Apps</span><span>Data</span><span>Status</span></div>
+      <div id="historyRows"><div class="empty">No prefill runs recorded yet.</div></div>
+    </div>
   </div>
 
   <div id="tabSelected">
