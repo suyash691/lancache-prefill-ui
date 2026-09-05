@@ -93,16 +93,31 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
     }
 
     [Fact]
-    public async Task Sse_NoToken_Returns401()
+    public async Task Sse_NoTicket_Returns401()
     {
         var resp = await Client().GetAsync("/api/events");
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
     [Fact]
-    public async Task Sse_WrongToken_Returns401()
+    public async Task Sse_BogusTicket_Returns401()
     {
+        var resp = await Client().GetAsync("/api/events?ticket=bogus");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Sse_LegacyTokenParam_Returns401()
+    {
+        // The long-lived session token is no longer accepted on the SSE URL.
         var resp = await Client().GetAsync("/api/events?token=bogus");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task SseTicket_Endpoint_RequiresAuth()
+    {
+        var resp = await Client().PostAsync("/api/sse-ticket", null);
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 }

@@ -38,6 +38,7 @@ builder.Services.AddSingleton<DepotDownloader>(sp => (DepotDownloader)sp.GetRequ
 
 // Services
 builder.Services.AddSingleton<JobCoordinator>();
+builder.Services.AddSingleton<SseTicketStore>();
 builder.Services.AddSingleton<ScanService>();
 builder.Services.AddSingleton<PrefillService>();
 builder.Services.AddSingleton<CacheBrowserService>();

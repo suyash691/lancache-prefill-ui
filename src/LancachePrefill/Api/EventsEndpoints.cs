@@ -7,11 +7,18 @@ public static class EventsEndpoints
 {
     public static void MapEventsEndpoint(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/events", async (HttpContext ctx, SteamSession session,
-            JobCoordinator jobs, IAppRepository appRepo) =>
+        // Header-authenticated by the global middleware (deliberately NOT under
+        // /api/events, which is exempt). Exchanges the session token for a
+        // single-use, 60s ticket that the EventSource URL carries instead of
+        // the long-lived session token.
+        app.MapPost("/api/sse-ticket", (SseTicketStore tickets) =>
+            Results.Ok(new { ticket = tickets.Issue() }));
+
+        app.MapGet("/api/events", async (HttpContext ctx,
+            JobCoordinator jobs, IAppRepository appRepo, SseTicketStore tickets) =>
         {
-            var qToken = ctx.Request.Query["token"].FirstOrDefault();
-            if (!SessionAuth.TokensMatch(session.SessionToken, qToken))
+            var qTicket = ctx.Request.Query["ticket"].FirstOrDefault();
+            if (!tickets.Redeem(qTicket))
             {
                 ctx.Response.StatusCode = 401;
                 return;

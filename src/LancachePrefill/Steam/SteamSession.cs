@@ -23,7 +23,15 @@ public sealed class SteamSession : ISteamSession, IDisposable
     public HashSet<uint> OwnedDepotIds { get; } = new();
     public List<uint> OwnedPackageIds { get; } = new();
     public int ResolvedPackageCount { get; private set; }
-    public string? SessionToken { get; private set; }
+
+    /// <summary>Web session token; reads as null once expired, forcing re-issue via auto-login.</summary>
+    public string? SessionToken =>
+        _sessionToken != null && DateTime.UtcNow - _sessionTokenIssuedAt < SessionTokenLifetime
+            ? _sessionToken : null;
+
+    private static readonly TimeSpan SessionTokenLifetime = TimeSpan.FromDays(7);
+    private string? _sessionToken;
+    private DateTime _sessionTokenIssuedAt;
 
     private bool _isConnected, _licensesReceived;
     private SteamUser.LoggedOnCallback? _logonResult;
@@ -85,7 +93,13 @@ public sealed class SteamSession : ISteamSession, IDisposable
         string? twoFactorCode, string? emailCode)
     {
         // Another caller may have completed the login while we waited on the lock.
-        if (SteamId != null && _isConnected && username == null) return null;
+        if (SteamId != null && _isConnected && username == null)
+        {
+            // The Steam session is live but the web token may have expired — re-mint
+            // so auto-login returns a usable token instead of null.
+            MintSessionTokenIfNeeded();
+            return null;
+        }
 
         if (_loginAttempts >= 5 && DateTime.UtcNow - _lastLoginAttempt < TimeSpan.FromMinutes(5))
             return "too_many_attempts";
@@ -168,14 +182,14 @@ public sealed class SteamSession : ISteamSession, IDisposable
         {
             await WaitFor(() => _licensesReceived, TimeSpan.FromSeconds(30), "receive licenses");
             await ResolvePackagesToAppsAsync(OwnedPackageIds);
-            // Keep the existing web session valid across background Steam re-logins;
-            // only mint a new token when there is none (fresh login / after logout).
-            SessionToken ??= Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            // Keep a live web session valid across background Steam re-logins; mint a
+            // new token only when there is none (fresh login, after logout, or expired).
+            MintSessionTokenIfNeeded();
         }
         catch
         {
             SteamId = null;
-            SessionToken = null;
+            _sessionToken = null;
             throw;
         }
     }
@@ -284,9 +298,18 @@ public sealed class SteamSession : ISteamSession, IDisposable
             ResolvedPackageCount, requests.Count, OwnedAppIds.Count, OwnedDepotIds.Count);
     }
 
+    private void MintSessionTokenIfNeeded()
+    {
+        if (SessionToken == null) // none yet, invalidated, or expired
+        {
+            _sessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _sessionTokenIssuedAt = DateTime.UtcNow;
+        }
+    }
+
     public void InvalidateSession()
     {
-        SessionToken = null;
+        _sessionToken = null;
         _log.LogInformation("Session invalidated");
     }
 
