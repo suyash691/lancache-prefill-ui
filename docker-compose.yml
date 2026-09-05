@@ -14,3 +14,4 @@ services:
       - SCAN_SCHEDULE=${SCAN_SCHEDULE:-0 3 */3 * *}
       - PORT=${PORT:-28542}
       - TZ=${TZ:-Europe/London}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}

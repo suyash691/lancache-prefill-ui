@@ -3,6 +3,9 @@ using Xunit;
 
 namespace LancachePrefill.Tests;
 
+// EnvSerial: TokenProtectionEnvKeyTests mutates TOKEN_ENCRYPTION_KEY process-wide,
+// which changes this class's key-derivation behavior if run concurrently.
+[Collection("EnvSerial")]
 public class TokenProtectionTests : IDisposable
 {
     private readonly string _dir;
