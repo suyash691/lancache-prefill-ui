@@ -3,6 +3,7 @@ using System;
 using LancachePrefill.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LancachePrefill.Data.Migrations
 {
     [DbContext(typeof(PrefillDbContext))]
-    partial class PrefillDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905192854_Ef9ModelSnapshot")]
+    partial class Ef9ModelSnapshot
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.19");

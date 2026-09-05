@@ -8,7 +8,9 @@
   <ItemGroup>
     <PackageReference Include="SteamKit2" Version="3.4.0" />
     <PackageReference Include="Cronos" Version="0.13.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <!-- EF Core packages move in lockstep (see dependabot 'efcore' group) —
+         mismatched majors across Sqlite/Design cause CS1705 build breaks. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.19" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.19">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
