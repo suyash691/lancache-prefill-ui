@@ -4,6 +4,12 @@ namespace LancachePrefill.Api;
 
 public static class SettingsEndpoints
 {
+    private static readonly HashSet<string> AllowedKeys = new(StringComparer.Ordinal)
+    {
+        "prefill_schedule", "scan_schedule",
+        "scan_concurrency", "prefill_concurrency", "prefill_max_mbps"
+    };
+
     public static RouteGroupBuilder MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/settings");
@@ -25,6 +31,12 @@ public static class SettingsEndpoints
 
         group.MapPost("/", (Dictionary<string, string> settings, ISettingsRepository settingsRepo) =>
         {
+            // Only known settings may be persisted — reject anything else instead of
+            // letting callers stuff arbitrary rows into the settings table.
+            var unknown = settings.Keys.Where(k => !AllowedKeys.Contains(k)).ToList();
+            if (unknown.Count > 0)
+                return Results.Json(new { error = $"Unknown setting(s): {string.Join(", ", unknown)}" }, statusCode: 400);
+
             // Validate cron expressions before saving
             foreach (var key in new[] { "prefill_schedule", "scan_schedule" })
             {
