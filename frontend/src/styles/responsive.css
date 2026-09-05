@@ -36,11 +36,24 @@
   /* Form controls */
   .add-row{flex-direction:column;align-items:stretch}
   .sort-controls{margin-left:0}
-  .lib-toolbar{flex-direction:column}
+  .lib-toolbar{flex-wrap:wrap}
+  .lib-toolbar .search{flex-basis:100%}
   .info-popover{right:10px;left:10px;min-width:auto}
 
   /* Dialog */
   .dialog{width:calc(100vw - 40px);padding:20px}
+
+  /* History: drop trigger + duration columns */
+  .th-history,.tr-history{grid-template-columns:minmax(110px,1fr) minmax(90px,1.2fr) 70px 70px;font-size:12px;gap:6px}
+  .th-history span:nth-child(2),.tr-history span:nth-child(2),
+  .th-history span:nth-child(3),.tr-history span:nth-child(3){display:none}
+
+  /* Activity: tighter cards, shorter chart, drop last-seen column */
+  .activity-card{padding:10px;min-width:100px}
+  .activity-num{font-size:17px}
+  .activity-chart{height:90px}
+  .th-clients,.tr-clients{grid-template-columns:1fr 90px 55px;font-size:12px}
+  .th-clients span:nth-child(4),.tr-clients span:nth-child(4){display:none}
 }
 
 /* Phone */
@@ -68,6 +81,24 @@
 
   /* Stacked panels */
   .panel{bottom:80px}
+
+  /* History on phones: date + apps + data only */
+  .th-history,.tr-history{grid-template-columns:minmax(90px,1fr) minmax(80px,1.4fr) 64px}
+  .th-history span:nth-child(6),.tr-history span:nth-child(6){display:none}
+
+  /* Quick-add dialog fills more of the screen */
+  #quickAddDialog .dialog{width:calc(100vw - 24px);max-height:80vh}
+
+  /* Touch targets: comfortable tap sizes on coarse pointers */
+  .tr,.lib-row,.evict-row,.cache-row,.tr-history,.tr-clients{min-height:44px}
+  .tab{padding:10px 12px}
+}
+
+/* Coarse pointer (touch) refinements regardless of width */
+@media (pointer: coarse) {
+  .btn{min-height:38px}
+  .btn-s{min-height:32px}
+  .panel-close,.pill-dismiss{padding:8px;font-size:20px}
 }
 
 /* Very small screens (320px) */
