@@ -270,8 +270,39 @@ public sealed class SteamSession : ISteamSession, IDisposable
     private void OnLicenseList(SteamApps.LicenseListCallback cb)
     {
         if (cb.Result != EResult.OK) { _log.LogError("License list failed: {Result}", cb.Result); }
-        else { OwnedPackageIds.Clear(); foreach (var l in cb.LicenseList) OwnedPackageIds.Add(l.PackageID); }
+        else
+        {
+            OwnedPackageIds.Clear();
+            _packageCreated.Clear();
+            foreach (var l in cb.LicenseList)
+            {
+                OwnedPackageIds.Add(l.PackageID);
+                _packageCreated[l.PackageID] = l.TimeCreated;
+            }
+        }
         _licensesReceived = true;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, DateTime> _packageCreated = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, List<uint>> _packageApps = new();
+
+    /// <summary>App IDs from licenses granted within the window (e.g. recent purchases/activations).</summary>
+    public List<uint> GetRecentlyPurchasedAppIds(TimeSpan window) =>
+        ComputeRecentAppIds(
+            _packageCreated.Select(kv => (kv.Key, kv.Value)),
+            _packageApps,
+            DateTime.UtcNow - window);
+
+    public static List<uint> ComputeRecentAppIds(
+        IEnumerable<(uint PackageId, DateTime Created)> licenses,
+        System.Collections.Concurrent.ConcurrentDictionary<uint, List<uint>> packageApps,
+        DateTime cutoff)
+    {
+        var ids = new List<uint>();
+        foreach (var (pkgId, created) in licenses)
+            if (created >= cutoff && packageApps.TryGetValue(pkgId, out var apps))
+                ids.AddRange(apps);
+        return ids.Distinct().ToList();
     }
 
     public async Task ResolvePackagesToAppsAsync(IEnumerable<uint> packageIds)
@@ -292,8 +323,15 @@ public sealed class SteamSession : ISteamSession, IDisposable
                     if (result.Results != null)
                         foreach (var pkg in result.Results.SelectMany(r => r.Packages).Select(p => p.Value))
                         {
-                            foreach (var c in pkg.KeyValues["appids"].Children) OwnedAppIds.Add(c.AsUnsignedInteger());
+                            var pkgApps = new List<uint>();
+                            foreach (var c in pkg.KeyValues["appids"].Children)
+                            {
+                                var appId = c.AsUnsignedInteger();
+                                OwnedAppIds.Add(appId);
+                                pkgApps.Add(appId);
+                            }
                             foreach (var c in pkg.KeyValues["depotids"].Children) OwnedDepotIds.Add(c.AsUnsignedInteger());
+                            _packageApps[pkg.ID] = pkgApps; // for recent-purchase lookups
                         }
                     ResolvedPackageCount += batchList.Count;
                     resolved = true;

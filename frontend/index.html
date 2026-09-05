@@ -80,6 +80,8 @@
     <div class="lib-toolbar">
       <input class="search" id="libSearch" placeholder="Search your Steam library..." oninput="_app.filterLibrary()" style="flex:1;margin-bottom:0">
       <button class="btn btn-g btn-s" onclick="_app.selectFiltered()">+ Add Filtered</button>
+      <button class="btn btn-b btn-s" onclick="_app.openTopGames()" title="Most played games on Steam right now">★ Top Games</button>
+      <button class="btn btn-b btn-s" onclick="_app.addRecentPurchases()" title="Add games from licenses granted in the last 14 days">🛒 Recent Purchases</button>
     </div>
     <div class="tbl">
       <div class="th-lib"><span class="col-id">ID</span><span>Name</span><span></span></div>
@@ -166,6 +168,18 @@
 <div id="scanPanel" class="panel" style="display:none">
   <div class="panel-header"><strong>Lancache Scan</strong><span class="panel-close" onclick="document.getElementById('scanPanel').style.display='none'">×</span></div>
   <div id="scanPanelBody" class="panel-body"></div>
+</div>
+
+<div class="overlay" id="quickAddDialog" style="display:none">
+  <div class="dialog" style="width:420px;max-height:70vh;display:flex;flex-direction:column">
+    <h2 id="quickAddTitle">★ Top Games</h2>
+    <p class="dialog-desc" id="quickAddDesc"></p>
+    <div id="quickAddRows" style="overflow-y:auto;text-align:left;flex:1"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-g dialog-btn" id="quickAddOwnedBtn" onclick="_app.quickAddAllOwned()">+ Add All Owned</button>
+      <span class="link" onclick="document.getElementById('quickAddDialog').style.display='none'">Close</span>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="scanDialog" style="display:none">
