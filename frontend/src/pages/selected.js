@@ -51,10 +51,10 @@ export function renderApps() {
     const appSt = state.appStatus[id];
     let cache = `<span class="badge b">—</span>`;
     if (appSt === 'partial') { cache = `<span class="badge y" title="Partially cached">${t('badge.partial')}</span>`; }
-    else if (sc) { cache = sc.cached ? `<span class="badge g"${cm ? ` title="Cached: ${cm}"` : ''}>${t('badge.cached')}</span>` : sc.error ? '<span class="badge b">—</span>' : `<span class="badge r">${t('badge.missing')}</span>`; }
-    else if (cm) { cache = `<span class="badge g" title="Cached: ${cm}">${t('badge.cached')}</span>`; }
+    else if (sc) { cache = sc.cached ? `<span class="badge g"${cm ? ` title="Cached: ${esc(cm)}"` : ''}>${t('badge.cached')}</span>` : sc.error ? '<span class="badge b">—</span>' : `<span class="badge r">${t('badge.missing')}</span>`; }
+    else if (cm) { cache = `<span class="badge g" title="Cached: ${esc(cm)}">${t('badge.cached')}</span>`; }
     const u = state.utd[id], mf = state.manifests[id] || '';
-    const ver = u === true ? `<span class="badge g" title="Latest: ${mf}">${t('badge.current')}</span>` : u === false ? `<span class="badge y" title="Latest: ${mf}">${t('badge.updateAvailable')}</span>` : '<span class="badge b">—</span>';
+    const ver = u === true ? `<span class="badge g" title="Latest: ${esc(mf)}">${t('badge.current')}</span>` : u === false ? `<span class="badge y" title="Latest: ${esc(mf)}">${t('badge.updateAvailable')}</span>` : '<span class="badge b">—</span>';
     const needsSync = u === false || (!sc?.cached && u !== true) || appSt === 'partial';
     const actionBtn = needsSync
       ? `<button class="btn btn-a btn-s" data-action="prefillOne" data-id="${id}">⟳ ${t('actions.sync')}</button>`

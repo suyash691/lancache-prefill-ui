@@ -9,12 +9,19 @@ public static class TokenProtection
     private const int NonceSize = 12;
     private const int TagSize = 16;
 
-    private static byte[]? _cachedKey;
-    private static string? _cachedKeyDir;
+    /// <summary>
+    /// Environment variable holding an optional user-supplied encryption secret.
+    /// When set, the token key derives from this value instead of the on-disk
+    /// machine identity — protecting the stored Steam refresh token from anyone
+    /// who obtains a copy of the config volume.
+    /// </summary>
+    public const string KeyEnvVar = "TOKEN_ENCRYPTION_KEY";
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _keyCache = new();
 
     public static string Encrypt(string plaintext, string configDir)
     {
-        var key = GetKey(configDir);
+        var key = GetEncryptKey(configDir);
         var nonce = RandomNumberGenerator.GetBytes(NonceSize);
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
         var ciphertext = new byte[plaintextBytes.Length];
@@ -32,36 +39,58 @@ public static class TokenProtection
 
     public static string? Decrypt(string encoded, string configDir)
     {
-        try
+        byte[] combined;
+        try { combined = Convert.FromBase64String(encoded); }
+        catch (FormatException) { return null; }
+        if (combined.Length < NonceSize + TagSize) return null;
+
+        var nonce = combined[..NonceSize];
+        var tag = combined[NonceSize..(NonceSize + TagSize)];
+        var ciphertext = combined[(NonceSize + TagSize)..];
+
+        // Try the user-supplied key first (when configured), then the legacy
+        // machine-identity key so tokens encrypted before TOKEN_ENCRYPTION_KEY
+        // was set still decrypt; the next SaveToken re-encrypts under the new key.
+        foreach (var key in GetDecryptKeys(configDir))
         {
-            var combined = Convert.FromBase64String(encoded);
-            if (combined.Length < NonceSize + TagSize) return null;
-
-            var key = GetKey(configDir);
-            var nonce = combined[..NonceSize];
-            var tag = combined[NonceSize..(NonceSize + TagSize)];
-            var ciphertext = combined[(NonceSize + TagSize)..];
-            var plaintext = new byte[ciphertext.Length];
-
-            using var aes = new AesGcm(key, TagSize);
-            aes.Decrypt(nonce, ciphertext, tag, plaintext);
-            return Encoding.UTF8.GetString(plaintext);
+            try
+            {
+                var plaintext = new byte[ciphertext.Length];
+                using var aes = new AesGcm(key, TagSize);
+                aes.Decrypt(nonce, ciphertext, tag, plaintext);
+                return Encoding.UTF8.GetString(plaintext);
+            }
+            catch (CryptographicException) { /* try next candidate key */ }
         }
-        catch (CryptographicException) { return null; }
+        return null;
     }
 
-    private static byte[] GetKey(string configDir)
+    private static byte[] GetEncryptKey(string configDir)
     {
-        var fullPath = Path.GetFullPath(configDir);
-        if (_cachedKey != null && _cachedKeyDir == fullPath) return _cachedKey;
-
-        var identity = GetMachineIdentity(configDir) + "|" + fullPath;
-        var salt = Encoding.UTF8.GetBytes("lancache-prefill-v1");
-        _cachedKey = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(identity), salt, 100_000, HashAlgorithmName.SHA256, KeySize);
-        _cachedKeyDir = fullPath;
-        return _cachedKey;
+        var userKey = Environment.GetEnvironmentVariable(KeyEnvVar);
+        return !string.IsNullOrWhiteSpace(userKey)
+            ? DeriveKey("user-key|" + userKey)
+            : DeriveKey(LegacyIdentity(configDir));
     }
+
+    private static IEnumerable<byte[]> GetDecryptKeys(string configDir)
+    {
+        var userKey = Environment.GetEnvironmentVariable(KeyEnvVar);
+        if (!string.IsNullOrWhiteSpace(userKey))
+            yield return DeriveKey("user-key|" + userKey);
+        yield return DeriveKey(LegacyIdentity(configDir));
+    }
+
+    private static string LegacyIdentity(string configDir) =>
+        GetMachineIdentity(configDir) + "|" + Path.GetFullPath(configDir);
+
+    private static byte[] DeriveKey(string identity) =>
+        _keyCache.GetOrAdd(identity, id =>
+        {
+            var salt = Encoding.UTF8.GetBytes("lancache-prefill-v1");
+            return Rfc2898DeriveBytes.Pbkdf2(
+                Encoding.UTF8.GetBytes(id), salt, 100_000, HashAlgorithmName.SHA256, KeySize);
+        });
 
     private static string GetMachineIdentity(string configDir)
     {

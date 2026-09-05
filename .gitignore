@@ -8,3 +8,6 @@ logs/
 node_modules/
 frontend/node_modules/
 src/LancachePrefill/wwwroot/assets/
+
+# Built by 'npm run build' in frontend/ (vite outDir) — not source
+src/LancachePrefill/wwwroot/

@@ -13,7 +13,8 @@ public class JobCoordinator
     private volatile CancellationTokenSource? _scanCts;
     private volatile int _stateVersion;
 
-    public string? ActiveJob { get; set; }
+    private volatile string? _activeJob;
+    public string? ActiveJob { get => _activeJob; set => _activeJob = value; }
     public int StateVersion => _stateVersion;
     public void BumpVersion() => Interlocked.Increment(ref _stateVersion);
 

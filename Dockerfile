@@ -21,4 +21,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 28542
+# Run as the non-root 'app' user (UID 1654) shipped with the .NET base image.
+# NOTE: the /Config volume must be writable by this UID — see docker-compose.yml.
+USER $APP_UID
 ENTRYPOINT ["dotnet", "LancachePrefill.dll"]

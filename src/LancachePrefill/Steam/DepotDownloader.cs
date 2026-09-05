@@ -12,6 +12,9 @@ public class DepotDownloader : IDepotDownloader
     private readonly BandwidthLimiter _limiter = new();
     private readonly string? _lancacheCacheDir;
     private string? _lancacheIp;
+    private DateTime _lancacheCheckedAt;
+    private static readonly TimeSpan DetectSuccessTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DetectFailureTtl = TimeSpan.FromSeconds(30);
     private Server? _cdnServer;
     private DateTime _cdnServerFetchedAt;
 
@@ -32,19 +35,37 @@ public class DepotDownloader : IDepotDownloader
 
     public async Task<string?> DetectLancacheAsync()
     {
-        if (_lancacheIp != null) return _lancacheIp;
+        // TTL cache both ways: successes re-verify every 5 min (picks up an IP
+        // change), failures are cached only 30s — so fixing DNS after seeing
+        // "not detected" is noticed quickly, while the unauthenticated
+        // /api/lancache endpoint can't drive a DNS resolve per request.
+        var age = DateTime.UtcNow - _lancacheCheckedAt;
+        if (_lancacheCheckedAt != default && age < (_lancacheIp != null ? DetectSuccessTtl : DetectFailureTtl))
+            return _lancacheIp;
         try
         {
+            string? found = null;
             foreach (var addr in await System.Net.Dns.GetHostAddressesAsync("lancache.steamcontent.com"))
                 if (NetworkUtils.IsPrivateIp(addr))
                 {
-                    _lancacheIp = addr.ToString();
-                    _log.LogInformation("Lancache at {Ip}", _lancacheIp);
-                    return _lancacheIp;
+                    found = addr.ToString();
+                    break;
                 }
+            if (found != null && found != _lancacheIp)
+                _log.LogInformation("Lancache at {Ip}", found);
+            // Resolved successfully: a result with no private IP genuinely means
+            // "no lancache" — clear any previous value.
+            _lancacheIp = found;
         }
-        catch (Exception ex) { _log.LogWarning(ex, "Failed to resolve lancache.steamcontent.com"); }
-        return null;
+        catch (Exception ex)
+        {
+            // DNS error: keep the last-known-good IP (stale-if-error) so a
+            // transient resolver blip doesn't fail an otherwise healthy run.
+            _log.LogWarning(ex, "Failed to resolve lancache.steamcontent.com{Kept}",
+                _lancacheIp != null ? " — keeping last-known IP" : "");
+        }
+        _lancacheCheckedAt = DateTime.UtcNow;
+        return _lancacheIp;
     }
 
     public async Task<Server> GetCdnServerAsync()

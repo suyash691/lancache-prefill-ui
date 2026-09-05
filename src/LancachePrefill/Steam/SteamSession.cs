@@ -23,12 +23,22 @@ public sealed class SteamSession : ISteamSession, IDisposable
     public HashSet<uint> OwnedDepotIds { get; } = new();
     public List<uint> OwnedPackageIds { get; } = new();
     public int ResolvedPackageCount { get; private set; }
-    public string? SessionToken { get; private set; }
+
+    /// <summary>Web session token; reads as null once expired, forcing re-issue via auto-login.</summary>
+    public string? SessionToken =>
+        _sessionToken != null && DateTime.UtcNow - _sessionTokenIssuedAt < SessionTokenLifetime
+            ? _sessionToken : null;
+
+    private static readonly TimeSpan SessionTokenLifetime = TimeSpan.FromDays(7);
+    private string? _sessionToken;
+    private DateTime _sessionTokenIssuedAt;
 
     private bool _isConnected, _licensesReceived;
     private SteamUser.LoggedOnCallback? _logonResult;
     private int _loginAttempts;
     private DateTime _lastLoginAttempt = DateTime.MinValue;
+    private DateTime _lastTokenLoginAttempt = DateTime.MinValue;
+    private readonly SemaphoreSlim _loginLock = new(1, 1);
 
     private string TokenPath => Path.Combine(_configDir, "token.enc");
     private string UsernamePath => Path.Combine(_configDir, "username.txt");
@@ -53,12 +63,64 @@ public sealed class SteamSession : ISteamSession, IDisposable
     public async Task<string?> LoginAsync(string? username = null, string? password = null,
         string? twoFactorCode = null, string? emailCode = null)
     {
-        if (_loginAttempts >= 5 && DateTime.UtcNow - _lastLoginAttempt < TimeSpan.FromMinutes(5))
-            return "too_many_attempts";
-        if (DateTime.UtcNow - _lastLoginAttempt >= TimeSpan.FromMinutes(5))
-            _loginAttempts = 0;
-        _loginAttempts++;
-        _lastLoginAttempt = DateTime.UtcNow;
+        // Serialize logins — the UI, page-load auto-login, and background schedulers
+        // can all try to (re)establish the session concurrently.
+        await _loginLock.WaitAsync();
+        try { return await LoginLockedAsync(username, password, twoFactorCode, emailCode); }
+        finally { _loginLock.Release(); }
+    }
+
+    /// <summary>
+    /// Ensures a live, logged-in Steam session, re-logging in with the stored
+    /// refresh token when needed. Never throws — safe for background schedulers.
+    /// </summary>
+    public async Task<bool> EnsureConnectedAsync()
+    {
+        if (SteamId != null && _isConnected) return true;
+        if (!HasCredentials) return false;
+        try
+        {
+            var result = await LoginAsync();
+            if (result != null) _log.LogWarning("Background Steam re-login failed: {Reason}", result);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Background Steam re-login failed");
+        }
+        return SteamId != null && _isConnected;
+    }
+
+    private async Task<string?> LoginLockedAsync(string? username, string? password,
+        string? twoFactorCode, string? emailCode)
+    {
+        // Another caller may have completed the login while we waited on the lock.
+        if (SteamId != null && _isConnected && username == null)
+        {
+            // The Steam session is live but the web token may have expired — re-mint
+            // so auto-login returns a usable token instead of null.
+            MintSessionTokenIfNeeded();
+            return null;
+        }
+
+        if (username != null)
+        {
+            // The lockout guards password guessing — only credential logins count.
+            if (_loginAttempts >= 5 && DateTime.UtcNow - _lastLoginAttempt < TimeSpan.FromMinutes(5))
+                return "too_many_attempts";
+            if (DateTime.UtcNow - _lastLoginAttempt >= TimeSpan.FromMinutes(5))
+                _loginAttempts = 0;
+            _loginAttempts++;
+            _lastLoginAttempt = DateTime.UtcNow;
+        }
+        else
+        {
+            // Stored-token re-logins aren't guessable, so they must not consume the
+            // lockout budget (an attacker spamming bad passwords would otherwise
+            // lock out auto-login too). Just bound how often we hit Steam.
+            if (DateTime.UtcNow - _lastTokenLoginAttempt < TimeSpan.FromSeconds(10))
+                return "too_many_attempts";
+            _lastTokenLoginAttempt = DateTime.UtcNow;
+        }
 
         InitClient();
 
@@ -73,11 +135,19 @@ public sealed class SteamSession : ISteamSession, IDisposable
 
         if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedUsername))
         {
+            _logonResult = null; // clear any stale result from a previous login/reconnect
             _steamUser.LogOn(new SteamUser.LogOnDetails
                 { Username = storedUsername, AccessToken = storedToken, ShouldRememberPassword = true });
             await WaitFor(() => _logonResult != null, TimeSpan.FromSeconds(30), "log in");
 
-            if (_logonResult!.Result == EResult.OK) { await PostLogin(); return null; }
+            if (_logonResult!.Result == EResult.OK)
+            {
+                await PostLogin();
+                // Re-save so the token migrates to the current-best encryption key
+                // (e.g. after TOKEN_ENCRYPTION_KEY is introduced).
+                SaveToken(storedToken);
+                return null;
+            }
             _logonResult = null;
         }
 
@@ -98,6 +168,7 @@ public sealed class SteamSession : ISteamSession, IDisposable
             SaveToken(pollResponse.RefreshToken);
             File.WriteAllText(UsernamePath, username);
 
+            _logonResult = null; // clear any stale result before the fresh LogOn
             _steamUser.LogOn(new SteamUser.LogOnDetails
                 { Username = username, AccessToken = pollResponse.RefreshToken, ShouldRememberPassword = true });
             await WaitFor(() => _logonResult != null, TimeSpan.FromSeconds(30), "log in");
@@ -125,12 +196,14 @@ public sealed class SteamSession : ISteamSession, IDisposable
         {
             await WaitFor(() => _licensesReceived, TimeSpan.FromSeconds(30), "receive licenses");
             await ResolvePackagesToAppsAsync(OwnedPackageIds);
-            SessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            // Keep a live web session valid across background Steam re-logins; mint a
+            // new token only when there is none (fresh login, after logout, or expired).
+            MintSessionTokenIfNeeded();
         }
         catch
         {
             SteamId = null;
-            SessionToken = null;
+            _sessionToken = null;
             throw;
         }
     }
@@ -169,7 +242,16 @@ public sealed class SteamSession : ISteamSession, IDisposable
 
         _callbacks = new CallbackManager(_client);
         _callbacks.Subscribe<SteamClient.ConnectedCallback>(_ => _isConnected = true);
-        _callbacks.Subscribe<SteamClient.DisconnectedCallback>(_ => _isConnected = false);
+        _callbacks.Subscribe<SteamClient.DisconnectedCallback>(_ =>
+        {
+            _isConnected = false;
+            // Steam CMs routinely drop idle connections (nightly, plus Tuesday
+            // maintenance). Clear SteamId so schedulers and endpoints see the truth
+            // and re-login with the stored refresh token instead of failing mid-job.
+            if (SteamId != null)
+                _log.LogInformation("Steam disconnected — will re-login on next use");
+            SteamId = null;
+        });
         _callbacks.Subscribe<SteamUser.LoggedOnCallback>(cb => { _logonResult = cb; CellId = cb.CellID; });
         _callbacks.Subscribe<SteamApps.LicenseListCallback>(OnLicenseList);
 
@@ -230,9 +312,18 @@ public sealed class SteamSession : ISteamSession, IDisposable
             ResolvedPackageCount, requests.Count, OwnedAppIds.Count, OwnedDepotIds.Count);
     }
 
+    private void MintSessionTokenIfNeeded()
+    {
+        if (SessionToken == null) // none yet, invalidated, or expired
+        {
+            _sessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _sessionTokenIssuedAt = DateTime.UtcNow;
+        }
+    }
+
     public void InvalidateSession()
     {
-        SessionToken = null;
+        _sessionToken = null;
         _log.LogInformation("Session invalidated");
     }
 
