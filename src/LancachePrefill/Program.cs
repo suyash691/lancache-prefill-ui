@@ -10,7 +10,45 @@ var builder = WebApplication.CreateBuilder(args);
 var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? "/Config";
 var port = Environment.GetEnvironmentVariable("PORT") ?? "28542";
 
-var cert = CertificateManager.GetOrCreateCert(configDir);
+// Preflight: the container runs as non-root (UID 1654). A config volume created
+// by an older root-running container is not writable by it and every startup
+// step (cert, DB, token) would fail with a bare UnauthorizedAccessException
+// crash loop. Probe once and fail with instructions instead.
+static void FailConfigDirUnusable(string dir, Exception ex)
+{
+    Console.Error.WriteLine(
+        $"FATAL: config directory '{dir}' is not accessible by this user ({Environment.UserName}).\n" +
+        $"       {ex.Message}\n" +
+        "This container runs as non-root (UID 1654). If the volume was created by an\n" +
+        "older (root) version, fix its ownership on the docker host:\n" +
+        "    sudo chown -R 1654:1654 <host path mapped to /Config>\n" +
+        "or temporarily run as root by uncommenting 'user: \"0:0\"' in docker-compose.yml.");
+    Environment.Exit(64);
+}
+
+try
+{
+    Directory.CreateDirectory(configDir);
+    var probe = Path.Combine(configDir, ".write-probe");
+    File.WriteAllText(probe, "");
+    File.Delete(probe);
+}
+catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+{
+    FailConfigDirUnusable(configDir, ex);
+}
+
+System.Security.Cryptography.X509Certificates.X509Certificate2 cert;
+try
+{
+    cert = CertificateManager.GetOrCreateCert(configDir);
+}
+catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+{
+    // Dir is writable but an existing root-owned file (e.g. server.pfx 600) isn't.
+    FailConfigDirUnusable(configDir, ex);
+    throw; // unreachable — FailConfigDirUnusable exits
+}
 builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(int.Parse(port), o => o.UseHttps(cert)));
 
 // Localization
