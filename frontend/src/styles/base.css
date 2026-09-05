@@ -1,7 +1,10 @@
 /* Reset & base */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.container{max-width:1000px;margin:0 auto;padding:20px;padding-bottom:80px}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.container{max-width:1000px;margin:0 auto;padding:20px;padding-bottom:80px;
+  padding-left:max(20px, env(safe-area-inset-left));
+  padding-right:max(20px, env(safe-area-inset-right))}
 a{color:var(--accent);text-decoration:none}
 .empty{text-align:center;padding:30px;color:var(--muted)}
 .empty a,.empty .link-action{color:var(--accent);cursor:pointer;text-decoration:underline}
