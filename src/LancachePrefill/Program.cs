@@ -76,8 +76,14 @@ scanService.RestoreFromDb();
 var session = app.Services.GetRequiredService<SteamSession>();
 app.Use(async (ctx, next) =>
 {
-    var path = ctx.Request.Path.Value ?? "";
-    if (path.StartsWith("/api/") && !path.StartsWith("/api/auth/") && !path.StartsWith("/api/lancache") && !path.StartsWith("/api/events"))
+    // Endpoint routing matches paths case-insensitively, so this gate must too —
+    // otherwise "/Api/apps" would skip the token check yet still reach the endpoint.
+    // StartsWithSegments also enforces segment boundaries ("/api/authx" is not exempt).
+    var path = ctx.Request.Path;
+    if (path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/lancache", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/events", StringComparison.OrdinalIgnoreCase))
     {
         var token = ctx.Request.Headers["X-Session-Token"].FirstOrDefault();
         if (!SessionAuth.TokensMatch(session.SessionToken, token))

@@ -63,6 +63,19 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
+    // Endpoint routing is case-insensitive, so the auth gate must be too.
+    // These would return 200 with the old case-sensitive StartsWith gate.
+    [Theory]
+    [InlineData("/Api/apps")]
+    [InlineData("/API/settings")]
+    [InlineData("/api/Apps")]
+    [InlineData("/API/EVENTS")] // SSE gate is its own token check — must still 401
+    public async Task ProtectedEndpoint_CaseVariantPath_NoToken_Returns401(string path)
+    {
+        var resp = await Client().GetAsync(path);
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
     [Fact]
     public async Task ProtectedEndpoint_WrongToken_Returns401()
     {
