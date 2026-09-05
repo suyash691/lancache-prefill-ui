@@ -121,6 +121,18 @@
         <label>Prefill Bandwidth Limit (Mbps, 0 = unlimited)</label>
         <input class="search" id="setPrefillMaxMbps" type="number" min="0" style="margin-bottom:0;width:110px" placeholder="0">
       </div>
+      <div class="setting-row">
+        <label>Depot Platforms (which OS depots to download)</label>
+        <div style="display:flex;gap:16px;align-items:center">
+          <label style="font-weight:normal"><input type="checkbox" id="setOsWindows" checked> Windows</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsLinux"> Linux</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsMacos"> macOS</label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Depot Languages (comma list, e.g. english,german — empty = all)</label>
+        <input class="search" id="setLanguages" style="margin-bottom:0" placeholder="all languages">
+      </div>
       <button class="btn btn-a" onclick="_app.saveSettings()">💾 Save</button>
       <span id="settingsSaved" style="color:var(--green);font-size:13px;margin-left:12px;display:none">✓ Saved</span>
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--primary)">

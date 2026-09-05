@@ -30,6 +30,7 @@ public static class AppEndpoints
                     var hasInfo = appMap.TryGetValue(uid, out var a);
                     bool? upToDate = null;
                     string? latestManifest = null, cachedManifest = null;
+                    long pendingBytes = 0, totalBytes = 0;
                     if (hasInfo && a!.Depots.Count > 0)
                     {
                         upToDate = appRepo.IsAppUpToDate(a.Depots);
@@ -37,6 +38,12 @@ public static class AppEndpoints
                         var downloaded = appRepo.GetDownloadedManifests(a.Depots.Select(d => d.DepotId));
                         if (downloaded.Count > 0)
                             cachedManifest = string.Join(", ", downloaded.Select(kv => $"{kv.Key}:{kv.Value}"));
+                        // Size estimate straight from appinfo (no manifest fetches):
+                        // pending = compressed bytes of depots not yet at the current manifest.
+                        totalBytes = a.Depots.Sum(d => d.DownloadSize);
+                        pendingBytes = a.Depots
+                            .Where(d => !downloaded.TryGetValue(d.DepotId, out var m) || m != d.ManifestId)
+                            .Sum(d => d.DownloadSize);
                     }
                     return new
                     {
@@ -44,6 +51,7 @@ public static class AppEndpoints
                         name = hasInfo && !a!.Name.StartsWith("App ") ? a.Name
                             : extraNames.GetValueOrDefault(uid, hasInfo ? a!.Name : string.Format(fallback, id)),
                         upToDate, latestManifest, cachedManifest,
+                        pendingBytes, totalBytes,
                         status = appRepo.GetAppStatus(uid)
                     };
                 }));

@@ -2,7 +2,8 @@ namespace LancachePrefill;
 
 // Domain models
 public record AppState(uint AppId, string Name, List<DepotState> Depots);
-public record DepotState(uint DepotId, string? Name, ulong ManifestId, uint AppId, uint ContainingAppId);
+public record DepotState(uint DepotId, string? Name, ulong ManifestId, uint AppId, uint ContainingAppId,
+    long DownloadSize = 0); // compressed bytes from appinfo manifests/public/download; 0 = unknown
 public record DownloadChunk(uint DepotId, string ChunkId, uint CompressedLength);
 public record ScanResult(uint AppId, string Name, bool Cached, string? Error);
 public record ScanJobState(bool Running, string Status, int Done, int Total, List<ScanResult> Results);
