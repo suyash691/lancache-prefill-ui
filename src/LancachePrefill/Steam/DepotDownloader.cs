@@ -15,8 +15,11 @@ public class DepotDownloader : IDepotDownloader
     private DateTime _lancacheCheckedAt;
     private static readonly TimeSpan DetectSuccessTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DetectFailureTtl = TimeSpan.FromSeconds(30);
-    private Server? _cdnServer;
+    private List<SteamKit2.CDN.Server> _cdnServers = new();
+    private int _cdnRotation;
     private DateTime _cdnServerFetchedAt;
+    /// <summary>Number of CDN hosts to spread chunk fetches across.</summary>
+    private const int CdnPoolSize = 8;
 
     /// <summary>Monolithic lancache stores content in 1 MiB slices (nginx `slice 1m`).</summary>
     private const int SliceSize = 1_048_576;
@@ -68,29 +71,40 @@ public class DepotDownloader : IDepotDownloader
         return _lancacheIp;
     }
 
-    public async Task<Server> GetCdnServerAsync()
+    public async Task<Server> GetCdnServerAsync() => (await GetCdnServersAsync())[0];
+
+    /// <summary>
+    /// Top CDN servers by load, refreshed every 30 min. Chunk downloads rotate
+    /// across the pool — a single pinned upstream is otherwise the throughput
+    /// ceiling on first-fill, and one bad host degrades the whole run.
+    /// </summary>
+    public async Task<List<Server>> GetCdnServersAsync()
     {
-        // Refresh periodically — a pinned-forever server turns one bad CDN host into
-        // a whole-run failure.
-        if (_cdnServer != null && DateTime.UtcNow - _cdnServerFetchedAt < TimeSpan.FromMinutes(30))
-            return _cdnServer;
+        if (_cdnServers.Count > 0 && DateTime.UtcNow - _cdnServerFetchedAt < TimeSpan.FromMinutes(30))
+            return _cdnServers;
         try
         {
             var servers = await _session.SteamContent.GetServersForSteamPipe();
-            _cdnServer = servers
+            var pool = servers
                 .Where(s => (s.Type == "SteamCache" || s.Type == "CDN") && s.AllowedAppIds.Length == 0)
                 .OrderBy(s => s.Load)
-                .FirstOrDefault() ?? throw new InvalidOperationException("No CDN servers available");
+                .Take(CdnPoolSize)
+                .ToList();
+            if (pool.Count == 0) throw new InvalidOperationException("No CDN servers available");
+            _cdnServers = pool;
             _cdnServerFetchedAt = DateTime.UtcNow;
-            _log.LogInformation("CDN: {Host}", _cdnServer.Host);
-            return _cdnServer;
+            _log.LogInformation("CDN pool: {Hosts}", string.Join(", ", pool.Select(s => s.Host)));
+            return _cdnServers;
         }
-        catch when (_cdnServer != null)
+        catch when (_cdnServers.Count > 0)
         {
-            // Refresh failed but we still have a working server — keep using it.
-            return _cdnServer;
+            // Refresh failed but we still have working servers — keep using them.
+            return _cdnServers;
         }
     }
+
+    private Server NextCdnServer(List<Server> pool) =>
+        pool[(int)((uint)Interlocked.Increment(ref _cdnRotation) % pool.Count)];
 
     public async Task<List<DownloadChunk>> GetManifestChunksAsync(DepotState depot)
     {
@@ -131,7 +145,7 @@ public class DepotDownloader : IDepotDownloader
     {
         var lancacheIp = await DetectLancacheAsync()
             ?? throw new InvalidOperationException("No Lancache detected");
-        var cdnServer = await GetCdnServerAsync();
+        var cdnPool = await GetCdnServersAsync();
 
         concurrency = Math.Clamp(concurrency, 1, 30);
         _limiter.SetRate(maxBytesPerSec);
@@ -159,7 +173,7 @@ public class DepotDownloader : IDepotDownloader
                 }
                 else
                 {
-                    var error = await TryDownloadChunk(chunk, lancacheIp, cdnServer, token);
+                    var error = await TryDownloadChunk(chunk, lancacheIp, NextCdnServer(cdnPool), token);
                     if (error == null)
                     {
                         Interlocked.Increment(ref ok);
@@ -183,14 +197,14 @@ public class DepotDownloader : IDepotDownloader
         if (failedChunks.Count > 0 && !ct.IsCancellationRequested)
         {
             _log.LogInformation("Retrying {Count} failed chunks (cache-busting)", failedChunks.Count);
-            cdnServer = await GetCdnServerAsync(); // may rotate to a healthier server (TTL)
+            cdnPool = await GetCdnServersAsync(); // may rotate to healthier servers (TTL)
             var stillFailing = new List<(DownloadChunk chunk, string error)>();
 
             foreach (var (chunk, firstError) in failedChunks)
             {
                 if (ct.IsCancellationRequested) break;
                 await Task.Delay(500, ct); // Brief pause before retry
-                var retryError = await TryDownloadChunk(chunk, lancacheIp, cdnServer, ct, idleTimeoutSec: 120, bustCache: true);
+                var retryError = await TryDownloadChunk(chunk, lancacheIp, NextCdnServer(cdnPool), ct, idleTimeoutSec: 120, bustCache: true);
                 if (retryError == null)
                 {
                     Interlocked.Increment(ref ok);

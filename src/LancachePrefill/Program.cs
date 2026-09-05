@@ -118,6 +118,7 @@ app.MapEvictedEndpoints();
 app.MapCacheBrowserEndpoints();
 app.MapSettingsEndpoints();
 app.MapHistoryEndpoints();
+app.MapCacheStatsEndpoints();
 app.MapEventsEndpoint();
 
 app.Lifetime.ApplicationStopping.Register(() =>
