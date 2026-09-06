@@ -11,11 +11,26 @@ public static class AppEndpoints
         var group = app.MapGroup("/api/apps");
 
         group.MapGet("/", async (IAppRepository appRepo, AppInfoProvider? appInfoProvider,
-            SteamSession session, IStringLocalizer<Messages> L, ILoggerFactory lf) =>
+            SteamSession session, JobCoordinator jobs, IStringLocalizer<Messages> L, ILoggerFactory lf) =>
         {
             var ids = appRepo.GetSelectedApps();
             if (session.SteamId == null || ids.Count == 0)
                 return Results.Ok(ids.Select(id => new { appId = id, name = string.Format(L["App_FallbackName"].Value, id), upToDate = (bool?)null }));
+            // Self-heal in the background: packages that failed to resolve at login
+            // (or arrived mid-session) get another chance without waiting for a
+            // Library-tab visit; bump the SSE version on progress so open tabs
+            // re-render with the corrected ownership.
+            if (!session.LicensesFullyResolved)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var before = session.OwnedAppIds.Count;
+                        await session.EnsureNewLicensesResolvedAsync();
+                        if (session.OwnedAppIds.Count != before) jobs.BumpVersion();
+                    }
+                    catch (Exception ex) { lf.CreateLogger("Apps").LogWarning(ex, "Background license resolution failed"); }
+                });
             try
             {
                 var apps = await appInfoProvider!.GetAppInfoAsync(ids.Select(x => (uint)x), skipOwnershipCheck: true);
@@ -53,9 +68,13 @@ public static class AppEndpoints
                         upToDate, latestManifest, cachedManifest,
                         pendingBytes, totalBytes,
                         status = appRepo.GetAppStatus(uid),
-                        // Ownership is only meaningful once the license list resolved;
-                        // an empty set means "unknown", not "owns nothing".
-                        owned = session.OwnedAppIds.Count > 0 ? session.OwnedAppIds.Contains(uid) : (bool?)null
+                        // Positive ownership is always trustworthy. A NEGATIVE is only
+                        // meaningful once every package has resolved — a mid-resolution
+                        // snapshot or a failed PICS chunk must show no badge, not a false
+                        // "Not owned" on a game the account owns.
+                        owned = session.OwnedAppIds.Contains(uid) ? true
+                            : session.LicensesFullyResolved && session.OwnedAppIds.Count > 0 ? false
+                            : (bool?)null
                     };
                 }));
             }
