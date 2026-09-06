@@ -91,6 +91,10 @@ public static class LibraryEndpoints
             try
             {
                 var selected = new HashSet<uint>(appRepo.GetSelectedApps());
+                // Catch up on licenses granted since login and on package chunks that
+                // failed to resolve at login — otherwise an owned game can be missing
+                // from the library until the next re-login.
+                await session.EnsureNewLicensesResolvedAsync();
                 var apps = await appInfoProvider!.GetAppInfoAsync(session.OwnedAppIds, skipOwnershipCheck: true);
                 cacheBrowser.PopulateMapFromOwnedApps(
                     apps.Select(a => (a.AppId, (string?)a.Name, a.Depots.Select(d => d.DepotId))));

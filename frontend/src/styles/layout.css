@@ -26,26 +26,26 @@ h1{margin-bottom:4px;font-size:22px}
 .tbl{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow-sm)}
 
 /* Selected Games: ID | Name | Cache | Status | Actions */
-.th,.tr{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,90px) minmax(80px,110px);padding:10px 14px;align-items:center;gap:6px}
+.th,.tr{display:grid;grid-template-columns:minmax(48px,76px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,90px) minmax(80px,110px);padding:10px 14px;align-items:center;gap:6px}
 .th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
 .tr{border-bottom:1px solid var(--border);transition:background .15s}
 .tr:hover{background:var(--hover)}
 
 /* Library: ID | Name | Action */
-.th-lib,.lib-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
+.th-lib,.lib-row{display:grid;grid-template-columns:minmax(48px,76px) minmax(100px,1fr) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
 .th-lib{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
 .lib-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
 .lib-row:hover{background:var(--hover)}
 .lib-selected{background:rgba(76,175,80,.05)}
 
 /* Evicted: ID | Name | Actions */
-.th-evict,.evict-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(120px,180px);padding:8px 14px;align-items:center;gap:6px}
+.th-evict,.evict-row{display:grid;grid-template-columns:minmax(48px,76px) minmax(100px,1fr) minmax(120px,180px);padding:8px 14px;align-items:center;gap:6px}
 .th-evict{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
 .evict-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
 .evict-row:hover{background:var(--hover)}
 
 /* Cache Browser: ID | Name | Chunks | Action */
-.th-cache,.cache-row{display:grid;grid-template-columns:minmax(40px,50px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
+.th-cache,.cache-row{display:grid;grid-template-columns:minmax(48px,76px) minmax(100px,1fr) minmax(60px,80px) minmax(60px,80px);padding:8px 14px;align-items:center;gap:6px}
 .th-cache{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--primary)}
 .cache-row{border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
 .cache-row:hover{background:var(--hover)}

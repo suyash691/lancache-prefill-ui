@@ -35,6 +35,9 @@ public static class SettingsEndpoints
             foreach (var (k, v) in saved)
                 if (!k.StartsWith("stat_")) // internal scan-written stats live in /api/cache-stats
                     defaults[k] = v;
+            // Read-only info: cron expressions evaluate in the container's local
+            // timezone — surface it so the UI can label the schedule fields.
+            defaults["timezone"] = TimeZoneInfo.Local.Id;
             return Results.Ok(defaults);
         });
 

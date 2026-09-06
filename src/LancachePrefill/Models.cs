@@ -10,7 +10,9 @@ public record ScanJobState(bool Running, string Status, int Done, int Total, Lis
 public record QueuedSync(List<uint> AppIds, bool Force);
 
 // Download result from DepotDownloader
-public record ChunkDownloadResult(int Ok, int Failed, long Bytes, List<string> Errors);
+// CachedBytes = compressed size of chunks verified already present in the cache
+// (probe-skipped) — no network transfer, but the content is demonstrably cached.
+public record ChunkDownloadResult(int Ok, int Failed, long Bytes, List<string> Errors, long CachedBytes = 0);
 
 // Per-app prefill result
 public record AppPrefillResult(
@@ -22,7 +24,8 @@ public record AppPrefillResult(
     int ChunksTotal,
     long Bytes,
     List<string> Warnings,
-    List<string> Errors
+    List<string> Errors,
+    long CachedBytes = 0
 );
 
 // Updated prefill progress with per-app results

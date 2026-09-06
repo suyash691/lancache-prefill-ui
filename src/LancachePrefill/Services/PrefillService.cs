@@ -66,7 +66,10 @@ public class PrefillService
             foreach (var id in queuedIds) _appInfo.InvalidateSingle(id);
 
             var apps = await _appInfo.GetAppInfoAsync(queuedIds, skipOwnershipCheck: true);
-            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token, "queued");
+            // Queue items only ever originate from user actions (per-app Sync,
+            // evicted re-cache) — record them as "manual" in run history, not the
+            // internal routing detail "queued".
+            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token, "manual");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log.LogError(ex, "Prefill queue failed"); }
@@ -141,6 +144,38 @@ public class PrefillService
             .Where(a => !processedIds.Contains(a.AppId))
             .Select(a => a.Name).ToList();
 
+        // Records an app that needs no download and marks it processed. Returns true when skipped.
+        bool recordIfNothingToDo(AppState app)
+        {
+            if (app.Depots.Count == 0)
+            {
+                results.Add(new AppPrefillResult(app.AppId, app.Name, "no_depots", 0, 0, 0, 0, [], []));
+                processedIds.Add(app.AppId);
+                skipped++;
+                return true;
+            }
+            if (!force && _appRepo.IsAppUpToDate(app.Depots))
+            {
+                results.Add(new AppPrefillResult(app.AppId, app.Name, "skipped", 0, 0, 0, 0, [], []));
+                processedIds.Add(app.AppId);
+                skipped++;
+                return true;
+            }
+            return false;
+        }
+
+        // Pre-partition: settle up-to-date / empty apps immediately so Total and
+        // "Up next" only reflect apps that will actually download. Without this,
+        // "Sync (2 updates)" opens a panel claiming 0/6 games with all six queued.
+        var toRun = new List<AppState>();
+        foreach (var app in apps)
+        {
+            if (processedIds.Contains(app.AppId) || toRun.Any(a => a.AppId == app.AppId)) continue;
+            if (!recordIfNothingToDo(app)) toRun.Add(app);
+        }
+        apps = toRun;
+        _jobs.Progress = new("running", null, 0, apps.Count, 0, true, results.ToList());
+
         int i = 0;
         while (i < apps.Count)
         {
@@ -151,24 +186,6 @@ public class PrefillService
             // Skip duplicates (in case same app queued multiple times)
             if (!processedIds.Add(app.AppId)) continue;
 
-            // No depots
-            if (app.Depots.Count == 0)
-            {
-                results.Add(new AppPrefillResult(app.AppId, app.Name, "no_depots", 0, 0, 0, 0, [], []));
-                skipped++; done++;
-                _jobs.Progress = _jobs.Progress with { Done = done, Results = results.ToList() };
-                continue;
-            }
-
-            // Already up-to-date
-            if (!force && _appRepo.IsAppUpToDate(app.Depots))
-            {
-                results.Add(new AppPrefillResult(app.AppId, app.Name, "skipped", 0, 0, 0, 0, [], []));
-                skipped++; done++;
-                _jobs.Progress = _jobs.Progress with { Done = done, Results = results.ToList() };
-                continue;
-            }
-
             _jobs.Progress = _jobs.Progress with { CurrentApp = app.Name, Done = done, Results = results.ToList(), CurrentChunksDone = 0, CurrentChunksTotal = null, CurrentAppBytes = 0, Pending = getPending(i) };
             _log.LogInformation("Downloading {App} ({Depots} depots)", app.Name, app.Depots.Count);
 
@@ -177,13 +194,30 @@ public class PrefillService
 
             try
             {
-                // Phase 1: Get manifest chunks (with error capture)
+                // Phase 1: Get manifest chunks — only for depots that actually changed.
+                // The UI's pending-size estimate is "compressed bytes of depots not at
+                // the stored manifest"; downloading must honor the same boundary or a
+                // one-depot patch (~314 MB) crawls every chunk of every depot (~50 GB
+                // pulled through the cache). force disables the filter: verify-and-repair
+                // deliberately re-walks everything.
+                var storedManifests = _appRepo.GetDownloadedManifests(app.Depots.Select(d => d.DepotId));
+                var depotsToFetch = force
+                    ? app.Depots
+                    : app.Depots.Where(d =>
+                        !storedManifests.TryGetValue(d.DepotId, out var m) || m != d.ManifestId).ToList();
+
+                if (depotsToFetch.Count < app.Depots.Count)
+                    _log.LogInformation("{App}: {Changed}/{Total} depots changed — skipping {Skipped} up-to-date depots",
+                        app.Name, depotsToFetch.Count, app.Depots.Count, app.Depots.Count - depotsToFetch.Count);
+
                 var allChunks = new List<DownloadChunk>();
-                foreach (var depot in app.Depots)
+                var failedDepots = new HashSet<uint>();
+                foreach (var depot in depotsToFetch)
                 {
                     try { allChunks.AddRange(await _downloader.GetManifestChunksAsync(depot)); }
                     catch (Exception ex)
                     {
+                        failedDepots.Add(depot.DepotId);
                         var depotMsg = $"Depot {depot.DepotId}: {ex.Message}";
                         warnings.Add(depotMsg);
                         _log.LogWarning("Manifest failed for {App} depot {DepotId}: {Error}", app.Name, depot.DepotId, ex.Message);
@@ -218,7 +252,7 @@ public class PrefillService
 
                 // Phase 3: Determine status and update DB
                 string status;
-                if (dlResult.Failed == 0)
+                if (dlResult.Failed == 0 && failedDepots.Count == 0)
                 {
                     status = "cached";
                     cached++;
@@ -241,9 +275,15 @@ public class PrefillService
                     status = "partial";
                     partial++;
 
-                    // Partial: do NOT mark depots as downloaded, set status to partial
                     try
                     {
+                        // A depot whose manifest fetch failed downloaded nothing — it must
+                        // NOT be stamped as downloaded (that would hide the missing content
+                        // as "current" forever). When only manifests failed (all listed
+                        // chunks landed), stamp the healthy depots so the next sync retries
+                        // just the failed ones.
+                        if (dlResult.Failed == 0 && failedDepots.Count > 0)
+                            _appRepo.MarkDepotsDownloaded(app.Depots.Where(d => !failedDepots.Contains(d.DepotId)));
                         _appRepo.MarkPartial(app.AppId);
                         _jobs.UpdateScanResult(app.AppId, app.Name, false, _scanRepo);
                     }
@@ -255,7 +295,8 @@ public class PrefillService
                 }
 
                 results.Add(new AppPrefillResult(app.AppId, app.Name, status,
-                    dlResult.Ok, dlResult.Failed, allChunks.Count, dlResult.Bytes, warnings, errors));
+                    dlResult.Ok, dlResult.Failed, allChunks.Count, dlResult.Bytes, warnings, errors,
+                    dlResult.CachedBytes));
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -282,8 +323,11 @@ public class PrefillService
                     {
                         foreach (var id in trulyNew) _appInfo.InvalidateSingle(id);
                         var newApps = await _appInfo.GetAppInfoAsync(trulyNew, skipOwnershipCheck: true);
-                        apps.AddRange(newApps);
-                        _jobs.Progress = _jobs.Progress with { Total = apps.Count };
+                        // Same partition as the initial list: settle up-to-date apps as
+                        // results immediately, count only real downloads in Total.
+                        var newToRun = newApps.Where(a => !recordIfNothingToDo(a)).ToList();
+                        apps.AddRange(newToRun);
+                        _jobs.Progress = _jobs.Progress with { Total = apps.Count, Results = results.ToList() };
                         _log.LogInformation("Absorbed {Count} queued apps into running prefill", newApps.Count);
                     }
                     catch (Exception ex)
@@ -314,7 +358,7 @@ public class PrefillService
                 AppsFailed = failed,
                 Bytes = totalBytes,
                 ResultsJson = System.Text.Json.JsonSerializer.Serialize(
-                    results.Select(r => new { appId = r.AppId, name = r.Name, status = r.Status, bytes = r.Bytes }))
+                    results.Select(r => new { appId = r.AppId, name = r.Name, status = r.Status, bytes = r.Bytes, cachedBytes = r.CachedBytes }))
             });
         }
         catch (Exception ex) { _log.LogWarning(ex, "Failed to record prefill run history"); }

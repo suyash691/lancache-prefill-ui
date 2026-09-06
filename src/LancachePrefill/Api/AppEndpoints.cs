@@ -52,16 +52,33 @@ public static class AppEndpoints
                             : extraNames.GetValueOrDefault(uid, hasInfo ? a!.Name : string.Format(fallback, id)),
                         upToDate, latestManifest, cachedManifest,
                         pendingBytes, totalBytes,
-                        status = appRepo.GetAppStatus(uid)
+                        status = appRepo.GetAppStatus(uid),
+                        // Ownership is only meaningful once the license list resolved;
+                        // an empty set means "unknown", not "owns nothing".
+                        owned = session.OwnedAppIds.Count > 0 ? session.OwnedAppIds.Contains(uid) : (bool?)null
                     };
                 }));
             }
             catch (Exception ex) { lf.CreateLogger("Apps").LogError(ex, "Failed to load apps"); return Results.Problem("Failed to load apps"); }
         });
 
-        group.MapPost("/add", (AddAppRequest req, IAppRepository appRepo, JobCoordinator jobs) =>
+        group.MapPost("/add", async (AddAppRequest req, IAppRepository appRepo, JobCoordinator jobs,
+            SteamSession session, AppInfoProvider? appInfoProvider) =>
         {
-            appRepo.AddSelectedApp(req.AppId); jobs.BumpVersion(); return Results.Ok();
+            // Reject IDs Steam doesn't know when we can check (session live).
+            // Fail open on PICS errors — a flaky lookup must not block adds.
+            if (session.SteamId != null && appInfoProvider != null)
+            {
+                try
+                {
+                    var names = await appInfoProvider.GetAppNamesAsync([req.AppId]);
+                    if (!names.TryGetValue(req.AppId, out var nm) || string.IsNullOrWhiteSpace(nm))
+                        return Results.Ok(new { added = false, error = "not_found" });
+                }
+                catch { /* lookup unavailable — allow the add */ }
+            }
+            appRepo.AddSelectedApp(req.AppId); jobs.BumpVersion();
+            return Results.Ok(new { added = true });
         });
 
         group.MapDelete("/{appId}", (uint appId, IAppRepository appRepo, JobCoordinator jobs) =>

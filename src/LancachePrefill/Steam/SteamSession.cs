@@ -281,10 +281,44 @@ public sealed class SteamSession : ISteamSession, IDisposable
             }
         }
         _licensesReceived = true;
+        // A license list arriving while already logged in means the account just
+        // gained licenses (e.g. a purchase). Resolve the delta in the background
+        // so the new game appears in the library without a re-login.
+        if (SteamId != null)
+            _ = Task.Run(async () =>
+            {
+                try { await EnsureNewLicensesResolvedAsync(); }
+                catch (Exception ex) { _log.LogWarning(ex, "Post-purchase package resolution failed"); }
+            });
     }
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, DateTime> _packageCreated = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, List<uint>> _packageApps = new();
+    private readonly SemaphoreSlim _resolveLock = new(1, 1);
+
+    /// <summary>
+    /// Resolves packages the license list contains but package→app resolution has
+    /// never seen — mid-session purchases, and chunks that failed at login (a chunk
+    /// that fails all retries used to leave its ~25 packages invisible until the
+    /// next re-login). Cheap no-op when everything is resolved.
+    /// </summary>
+    public async Task EnsureNewLicensesResolvedAsync()
+    {
+        List<uint> unresolved;
+        try { unresolved = OwnedPackageIds.Where(p => !_packageApps.ContainsKey(p)).ToList(); }
+        catch (InvalidOperationException) { return; } // license list mutating right now — next call catches up
+        if (unresolved.Count == 0) return;
+        await _resolveLock.WaitAsync();
+        try
+        {
+            try { unresolved = OwnedPackageIds.Where(p => !_packageApps.ContainsKey(p)).ToList(); }
+            catch (InvalidOperationException) { return; }
+            if (unresolved.Count == 0) return;
+            _log.LogInformation("Resolving {Count} packages missing from app resolution (new purchase or earlier failure)", unresolved.Count);
+            await ResolvePackagesToAppsAsync(unresolved);
+        }
+        finally { _resolveLock.Release(); }
+    }
 
     /// <summary>App IDs from licenses granted within the window (e.g. recent purchases/activations).</summary>
     public List<uint> GetRecentlyPurchasedAppIds(TimeSpan window) =>
