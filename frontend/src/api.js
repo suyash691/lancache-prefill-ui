@@ -20,7 +20,11 @@ export async function api(path, opts = {}) {
   const r = await fetch(path, opts);
 
   if (r.status === 401 && !path.includes('/auth/')) {
+    // A token that stops working means the 7-day session expired (or the
+    // backend re-minted it) — say so instead of a bare login popup.
+    const hadToken = !!token;
     setToken(null);
+    if (hadToken) showToast(t('login.sessionExpired'), 'error');
     showLogin();
     throw new Error('unauthorized');
   }

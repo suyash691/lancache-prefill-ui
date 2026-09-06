@@ -59,4 +59,20 @@ public class AccessLogTests
         Assert.Equal(1, s.Misses);
         Assert.Equal(2, s.Clients.Count); // 10.0.0.6's '-' line ignored, but its HIT counted
     }
+
+    [Fact]
+    public void Tracker_RevalidatedCountsAsHit()
+    {
+        // REVALIDATED = content served from the local cache after a conditional
+        // upstream check — it must count as a hit, not vanish from the stats.
+        var tracker = new ActivityTracker();
+        var now = DateTime.UtcNow;
+        tracker.Add(new AccessLogEntry("steam", "10.0.0.5", now, 200, 500, "REVALIDATED", "h"));
+        tracker.Add(new AccessLogEntry("steam", "10.0.0.5", now, 200, 100, "MISS", "h"));
+
+        var s = tracker.Snapshot();
+        Assert.Equal(500L, s.HitBytes);
+        Assert.Equal(1, s.Hits);
+        Assert.Equal(1, s.Misses);
+    }
 }

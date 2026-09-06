@@ -74,6 +74,7 @@
     "enterBoth": "Enter username and password",
     "incorrectPassword": "Incorrect password",
     "tooMany": "Too many attempts — wait 5 minutes",
+    "sessionExpired": "Session expired — please log in again",
     "connectionError": "Connection error",
     "deviceApprove": "Approve on your {0}",
     "steamApp": "Steam app",
@@ -108,6 +109,7 @@
     "updateAvailable": "Update available",
     "upToDate": "Up to date",
     "appAdded": "App {0} added",
+    "appNotFound": "App not found on Steam",
     "invalidAppId": "Enter a valid App ID",
     "failedRemove": "Failed to remove",
     "failed": "Failed",
@@ -166,7 +168,8 @@
     "partial": "Partial",
     "current": "Current",
     "updateAvailable": "Update available",
-    "selected": "Selected"
+    "selected": "Selected",
+    "notOwned": "Not owned"
   },
   "tips": [
     "Warming up the cache...",

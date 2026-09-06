@@ -29,9 +29,12 @@ export async function loadHistory() {
       + `<span title="up to date / skipped">−${r.appsSkipped}</span> <span title="failed">✗${r.appsFailed}</span>`;
     const status = r.status === 'done'
       ? `<span class="badge g">done</span>` : `<span class="badge y">cancelled</span>`;
-    const details = (r.results || []).map(a =>
-      `<div class="history-app"><span>${statusIcon[a.status] || '?'}</span> ${esc(a.name)}`
-      + `${a.bytes ? ` <span class="size-hint">${fmtB(a.bytes)}</span>` : ''}</div>`).join('');
+    const details = (r.results || []).map(a => {
+      const sz = [a.bytes ? fmtB(a.bytes) : null, a.cachedBytes ? `${fmtB(a.cachedBytes)} cached` : null]
+        .filter(Boolean).join(' + ');
+      return `<div class="history-app"><span>${statusIcon[a.status] || '?'}</span> ${esc(a.name)}`
+        + `${sz ? ` <span class="size-hint">${sz}</span>` : ''}</div>`;
+    }).join('');
     return `<div class="tr tr-history" data-runid="${r.id}">`
       + `<span>${started}</span><span>${trig}</span><span>${fmtDuration(r.startedAt, r.finishedAt)}</span>`
       + `<span>${apps}</span><span>${r.bytes ? fmtB(r.bytes) : '—'}</span><span>${status}</span></div>`

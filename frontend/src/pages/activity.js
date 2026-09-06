@@ -7,6 +7,8 @@ export async function loadActivity() {
 
   document.getElementById('activityUnavailable').style.display = resp.available ? 'none' : 'block';
   document.getElementById('activityContent').style.display = resp.available ? 'block' : 'none';
+  const sinceEl = document.getElementById('actSince');
+  if (sinceEl && resp.since) sinceEl.textContent = `Tracking since container start, ${timeAgo(new Date(resp.since))}.`;
   if (!resp.available || !resp.stats) return;
 
   const s = resp.stats;

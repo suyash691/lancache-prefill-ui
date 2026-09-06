@@ -12,8 +12,12 @@ public static class HistoryEndpoints
             Results.Ok(historyRepo.GetRuns(50).Select(r => new
             {
                 r.Id,
-                startedAt = r.StartedAt,
-                finishedAt = r.FinishedAt,
+                // Timestamps are stored as UTC but SQLite round-trips them with
+                // Kind=Unspecified — serialized without the Z suffix, the browser's
+                // Date() would misread them as local time. Re-stamp Utc so
+                // System.Text.Json emits the Z and toLocaleString() converts right.
+                startedAt = DateTime.SpecifyKind(r.StartedAt, DateTimeKind.Utc),
+                finishedAt = DateTime.SpecifyKind(r.FinishedAt, DateTimeKind.Utc),
                 trigger = r.Trigger,
                 status = r.Status,
                 appsCached = r.AppsCached,

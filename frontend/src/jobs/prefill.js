@@ -34,7 +34,8 @@ function renderAppResults(results) {
   return results.map(r => {
     const icon = statusIcon(r.status);
     const chunkInfo = r.chunksTotal > 0 ? ` — ${r.chunksOk.toLocaleString()}/${r.chunksTotal.toLocaleString()} chunks` : '';
-    const sizeInfo = r.bytes > 0 ? ` — ${fmtB(r.bytes)}` : '';
+    const sizeParts = [r.bytes > 0 ? fmtB(r.bytes) : null, r.cachedBytes > 0 ? `${fmtB(r.cachedBytes)} cached` : null].filter(Boolean);
+    const sizeInfo = sizeParts.length ? ` — ${sizeParts.join(' + ')}` : '';
     const hasIssues = (r.warnings && r.warnings.length > 0) || (r.errors && r.errors.length > 0);
     
     let html = `<div class="scan-row" style="padding:4px 0">`;

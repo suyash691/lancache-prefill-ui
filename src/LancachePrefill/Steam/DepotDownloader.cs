@@ -152,7 +152,7 @@ public class DepotDownloader : IDepotDownloader
 
         var errors = new List<string>();
         int ok = 0, failed = 0, skippedCached = 0;
-        long totalBytes = 0;
+        long totalBytes = 0, cachedBytes = 0;
 
         // Pass 1: Download all chunks
         var failedChunks = new System.Collections.Concurrent.ConcurrentBag<(DownloadChunk chunk, string error)>();
@@ -170,6 +170,7 @@ public class DepotDownloader : IDepotDownloader
                 {
                     Interlocked.Increment(ref ok);
                     Interlocked.Increment(ref skippedCached);
+                    Interlocked.Add(ref cachedBytes, chunk.CompressedLength);
                 }
                 else
                 {
@@ -225,7 +226,7 @@ public class DepotDownloader : IDepotDownloader
         else
             failed = failedChunks.Count;
 
-        return new ChunkDownloadResult(ok, failed, totalBytes, errors);
+        return new ChunkDownloadResult(ok, failed, totalBytes, errors, cachedBytes);
     }
 
     private async Task<string?> TryDownloadChunk(DownloadChunk chunk, string lancacheIp, Server cdnServer, CancellationToken ct, int idleTimeoutSec = 60, bool bustCache = false)

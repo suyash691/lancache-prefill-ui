@@ -9,7 +9,7 @@ public static class ActivityEndpoints
         app.MapGet("/api/activity", (ActivityTracker tracker) =>
         {
             var available = AccessLogTailService.LogFilePath() != null;
-            return Results.Ok(new { available, stats = available ? tracker.Snapshot() : null });
+            return Results.Ok(new { available, since = tracker.StartedAt, stats = available ? tracker.Snapshot() : null });
         });
     }
 }

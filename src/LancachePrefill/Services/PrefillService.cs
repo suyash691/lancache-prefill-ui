@@ -66,7 +66,10 @@ public class PrefillService
             foreach (var id in queuedIds) _appInfo.InvalidateSingle(id);
 
             var apps = await _appInfo.GetAppInfoAsync(queuedIds, skipOwnershipCheck: true);
-            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token, "queued");
+            // Queue items only ever originate from user actions (per-app Sync,
+            // evicted re-cache) — record them as "manual" in run history, not the
+            // internal routing detail "queued".
+            await RunPrefillInternalAsync(force, apps, _jobs.PrefillCts!.Token, "manual");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log.LogError(ex, "Prefill queue failed"); }
@@ -292,7 +295,8 @@ public class PrefillService
                 }
 
                 results.Add(new AppPrefillResult(app.AppId, app.Name, status,
-                    dlResult.Ok, dlResult.Failed, allChunks.Count, dlResult.Bytes, warnings, errors));
+                    dlResult.Ok, dlResult.Failed, allChunks.Count, dlResult.Bytes, warnings, errors,
+                    dlResult.CachedBytes));
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -354,7 +358,7 @@ public class PrefillService
                 AppsFailed = failed,
                 Bytes = totalBytes,
                 ResultsJson = System.Text.Json.JsonSerializer.Serialize(
-                    results.Select(r => new { appId = r.AppId, name = r.Name, status = r.Status, bytes = r.Bytes }))
+                    results.Select(r => new { appId = r.AppId, name = r.Name, status = r.Status, bytes = r.Bytes, cachedBytes = r.CachedBytes }))
             });
         }
         catch (Exception ex) { _log.LogWarning(ex, "Failed to record prefill run history"); }

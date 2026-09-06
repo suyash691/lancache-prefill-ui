@@ -15,6 +15,8 @@ export async function loadSettings() {
     document.getElementById('setOsLinux').checked = oses.includes('linux');
     document.getElementById('setOsMacos').checked = oses.includes('macos');
     document.getElementById('setLanguages').value = s.prefill_languages || '';
+    const tz = document.getElementById('cronTzHint');
+    if (tz && s.timezone) tz.textContent = `Cron schedules run in the container's timezone: ${s.timezone}`;
   } catch {}
 }
 

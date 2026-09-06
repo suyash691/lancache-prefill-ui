@@ -63,9 +63,14 @@ public class ActivityTracker
     private readonly ConcurrentDictionary<DateTime, Bucket> _buckets = new();
     private readonly ConcurrentDictionary<string, ClientStat> _clients = new();
 
+    /// <summary>When tracking began (tail starts at end-of-log, so stats cover container lifetime only).</summary>
+    public DateTime StartedAt { get; } = DateTime.UtcNow;
+
     public void Add(AccessLogEntry e)
     {
-        var isHit = e.CacheStatus == "HIT";
+        // REVALIDATED = served from local cache after a conditional upstream check —
+        // the content bytes came from the cache, so it counts as a hit.
+        var isHit = e.CacheStatus is "HIT" or "REVALIDATED";
         var isMiss = e.CacheStatus is "MISS" or "EXPIRED" or "UPDATING";
         if (!isHit && !isMiss) return; // '-', BYPASS etc. carry no cache signal
 
