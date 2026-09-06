@@ -39,6 +39,15 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
     private HttpClient Client() => _factory.CreateClient();
 
     [Fact]
+    public async Task Thumb_Endpoint_IsPublic()
+    {
+        // <img> tags cannot send the session-token header, so /api/thumb is
+        // exempt from the auth gate. Any status is fine except 401.
+        var resp = await Client().GetAsync("/api/thumb/730");
+        Assert.NotEqual(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task Lancache_Endpoint_IsPublic()
     {
         var resp = await Client().GetAsync("/api/lancache");

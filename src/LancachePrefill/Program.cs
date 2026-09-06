@@ -125,6 +125,9 @@ app.Use(async (ctx, next) =>
     if (path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
         && !path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase)
         && !path.StartsWithSegments("/api/lancache", StringComparison.OrdinalIgnoreCase)
+        // /api/thumb serves <img> tags, which cannot carry the token header; it
+        // only redirects to public Steam CDN assets (see ThumbEndpoints).
+        && !path.StartsWithSegments("/api/thumb", StringComparison.OrdinalIgnoreCase)
         && !path.StartsWithSegments("/api/events", StringComparison.OrdinalIgnoreCase))
     {
         var token = ctx.Request.Headers["X-Session-Token"].FirstOrDefault();
@@ -159,6 +162,7 @@ app.MapCacheBrowserEndpoints();
 app.MapSettingsEndpoints();
 app.MapHistoryEndpoints();
 app.MapCacheStatsEndpoints();
+app.MapThumbEndpoints();
 app.MapActivityEndpoints();
 app.MapEventsEndpoint();
 
