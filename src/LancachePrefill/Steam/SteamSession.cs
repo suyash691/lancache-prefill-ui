@@ -278,6 +278,10 @@ public sealed class SteamSession : ISteamSession, IDisposable
             {
                 OwnedPackageIds.Add(l.PackageID);
                 _packageCreated[l.PackageID] = l.TimeCreated;
+                // Newer packages require their license access token for PICS to
+                // return the app list — without it the package comes back empty
+                // and its games (recent purchases!) never enter OwnedAppIds.
+                _packageTokens[l.PackageID] = l.AccessToken;
             }
         }
         _licensesReceived = true;
@@ -287,14 +291,29 @@ public sealed class SteamSession : ISteamSession, IDisposable
         if (SteamId != null)
             _ = Task.Run(async () =>
             {
-                try { await EnsureNewLicensesResolvedAsync(); }
+                try { await EnsureNewLicensesResolvedAsync(force: true); }
                 catch (Exception ex) { _log.LogWarning(ex, "Post-purchase package resolution failed"); }
             });
     }
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, DateTime> _packageCreated = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, List<uint>> _packageApps = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, ulong> _packageTokens = new();
     private readonly SemaphoreSlim _resolveLock = new(1, 1);
+    private DateTime _lastEnsureAttempt = DateTime.MinValue;
+
+    /// <summary>
+    /// True when every owned package has been through package→app resolution.
+    /// While false, absence from OwnedAppIds means "unknown", not "not owned".
+    /// </summary>
+    public bool LicensesFullyResolved
+    {
+        get
+        {
+            try { return _licensesReceived && OwnedPackageIds.All(p => _packageApps.ContainsKey(p)); }
+            catch (InvalidOperationException) { return false; } // license list mutating right now
+        }
+    }
 
     /// <summary>
     /// Resolves packages the license list contains but package→app resolution has
@@ -302,12 +321,17 @@ public sealed class SteamSession : ISteamSession, IDisposable
     /// that fails all retries used to leave its ~25 packages invisible until the
     /// next re-login). Cheap no-op when everything is resolved.
     /// </summary>
-    public async Task EnsureNewLicensesResolvedAsync()
+    public async Task EnsureNewLicensesResolvedAsync(bool force = false)
     {
         List<uint> unresolved;
         try { unresolved = OwnedPackageIds.Where(p => !_packageApps.ContainsKey(p)).ToList(); }
         catch (InvalidOperationException) { return; } // license list mutating right now — next call catches up
         if (unresolved.Count == 0) return;
+        // Packages PICS persistently refuses would otherwise be retried on every
+        // page load — cap background retries to once a minute (a fresh license
+        // list bypasses the gate so purchases resolve immediately).
+        if (!force && DateTime.UtcNow - _lastEnsureAttempt < TimeSpan.FromSeconds(60)) return;
+        _lastEnsureAttempt = DateTime.UtcNow;
         await _resolveLock.WaitAsync();
         try
         {
@@ -341,7 +365,10 @@ public sealed class SteamSession : ISteamSession, IDisposable
 
     public async Task ResolvePackagesToAppsAsync(IEnumerable<uint> packageIds)
     {
-        var requests = packageIds.Select(id => new SteamApps.PICSRequest(id)).ToList();
+        var requests = packageIds.Select(id => new SteamApps.PICSRequest(id)
+        {
+            AccessToken = _packageTokens.GetValueOrDefault(id)
+        }).ToList();
         if (requests.Count == 0) return;
         ResolvedPackageCount = 0;
 
