@@ -34,7 +34,8 @@ function renderAppResults(results) {
   return results.map(r => {
     const icon = statusIcon(r.status);
     const chunkInfo = r.chunksTotal > 0 ? ` — ${r.chunksOk.toLocaleString()}/${r.chunksTotal.toLocaleString()} chunks` : '';
-    const sizeInfo = r.bytes > 0 ? ` — ${fmtB(r.bytes)}` : '';
+    const sizeParts = [r.bytes > 0 ? fmtB(r.bytes) : null, r.cachedBytes > 0 ? `${fmtB(r.cachedBytes)} cached` : null].filter(Boolean);
+    const sizeInfo = sizeParts.length ? ` — ${sizeParts.join(' + ')}` : '';
     const hasIssues = (r.warnings && r.warnings.length > 0) || (r.errors && r.errors.length > 0);
     
     let html = `<div class="scan-row" style="padding:4px 0">`;
@@ -114,7 +115,8 @@ export function updatePrefillUI(p) {
     try { localStorage.removeItem('prefillResults'); } catch {}
     pill.style.display = 'block'; pill.classList.add('active-pill');
     const effectiveTotal = p.total + state.syncQueue.reduce((s, q) => s + (q.appIds?.length || 0), 0);
-    const pct = effectiveTotal > 0 ? Math.round(p.done / effectiveTotal * 100) : 0;
+    // total can be 0 when every app was already current — a finished run is 100%.
+    const pct = effectiveTotal > 0 ? Math.round(p.done / effectiveTotal * 100) : (p.running ? 0 : 100);
     const chunkDetail = p.currentChunksTotal > 0 ? ` (${p.currentChunksDone}/${p.currentChunksTotal})` : '';
     pillText.textContent = `⟳ ${t('progress.prefillPct', pct)} — ${p.currentApp || t('prefill.starting')}${chunkDetail}`;
     pill.style.borderColor = 'var(--blue)';

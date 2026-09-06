@@ -15,7 +15,7 @@ namespace LancachePrefill.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.19");
 
             modelBuilder.Entity("LancachePrefill.Data.Entities.CacheFile", b =>
                 {
@@ -37,7 +37,6 @@ namespace LancachePrefill.Data.Migrations
             modelBuilder.Entity("LancachePrefill.Data.Entities.DepotAppMapping", b =>
                 {
                     b.Property<long>("DepotId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("depot_id");
 
@@ -75,10 +74,63 @@ namespace LancachePrefill.Data.Migrations
                     b.ToTable("downloaded_depots");
                 });
 
+            modelBuilder.Entity("LancachePrefill.Data.Entities.PrefillRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AppsCached")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("apps_cached");
+
+                    b.Property<int>("AppsFailed")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("apps_failed");
+
+                    b.Property<int>("AppsPartial")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("apps_partial");
+
+                    b.Property<int>("AppsSkipped")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("apps_skipped");
+
+                    b.Property<long>("Bytes")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("bytes");
+
+                    b.Property<DateTime>("FinishedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("ResultsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("results_json");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("run_trigger");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("prefill_runs");
+                });
+
             modelBuilder.Entity("LancachePrefill.Data.Entities.ScanResultEntity", b =>
                 {
                     b.Property<long>("AppId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("app_id");
 
@@ -109,7 +161,6 @@ namespace LancachePrefill.Data.Migrations
             modelBuilder.Entity("LancachePrefill.Data.Entities.SelectedApp", b =>
                 {
                     b.Property<long>("AppId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("app_id");
 

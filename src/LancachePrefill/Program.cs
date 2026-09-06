@@ -10,7 +10,45 @@ var builder = WebApplication.CreateBuilder(args);
 var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? "/Config";
 var port = Environment.GetEnvironmentVariable("PORT") ?? "28542";
 
-var cert = CertificateManager.GetOrCreateCert(configDir);
+// Preflight: the container runs as non-root (UID 1654). A config volume created
+// by an older root-running container is not writable by it and every startup
+// step (cert, DB, token) would fail with a bare UnauthorizedAccessException
+// crash loop. Probe once and fail with instructions instead.
+static void FailConfigDirUnusable(string dir, Exception ex)
+{
+    Console.Error.WriteLine(
+        $"FATAL: config directory '{dir}' is not accessible by this user ({Environment.UserName}).\n" +
+        $"       {ex.Message}\n" +
+        "This container runs as non-root (UID 1654). If the volume was created by an\n" +
+        "older (root) version, fix its ownership on the docker host:\n" +
+        "    sudo chown -R 1654:1654 <host path mapped to /Config>\n" +
+        "or temporarily run as root by uncommenting 'user: \"0:0\"' in docker-compose.yml.");
+    Environment.Exit(64);
+}
+
+try
+{
+    Directory.CreateDirectory(configDir);
+    var probe = Path.Combine(configDir, ".write-probe");
+    File.WriteAllText(probe, "");
+    File.Delete(probe);
+}
+catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+{
+    FailConfigDirUnusable(configDir, ex);
+}
+
+System.Security.Cryptography.X509Certificates.X509Certificate2 cert;
+try
+{
+    cert = CertificateManager.GetOrCreateCert(configDir);
+}
+catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+{
+    // Dir is writable but an existing root-owned file (e.g. server.pfx 600) isn't.
+    FailConfigDirUnusable(configDir, ex);
+    throw; // unreachable — FailConfigDirUnusable exits
+}
 builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(int.Parse(port), o => o.UseHttps(cert)));
 
 // Localization
@@ -27,6 +65,7 @@ builder.Services.AddSingleton<IAppRepository>(sp => new AppRepository(sp.GetRequ
 builder.Services.AddSingleton<ICacheRepository>(sp => new CacheRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 builder.Services.AddSingleton<IScanRepository>(sp => new ScanRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 builder.Services.AddSingleton<ISettingsRepository>(sp => new SettingsRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
+builder.Services.AddSingleton<IRunHistoryRepository>(sp => new RunHistoryRepository(sp.GetRequiredService<IDbContextFactory<PrefillDbContext>>()));
 
 // Steam
 builder.Services.AddSingleton(sp => new SteamSession(configDir, sp.GetRequiredService<ILogger<SteamSession>>()));
@@ -38,9 +77,12 @@ builder.Services.AddSingleton<DepotDownloader>(sp => (DepotDownloader)sp.GetRequ
 
 // Services
 builder.Services.AddSingleton<JobCoordinator>();
+builder.Services.AddSingleton<SseTicketStore>();
 builder.Services.AddSingleton<ScanService>();
 builder.Services.AddSingleton<PrefillService>();
 builder.Services.AddSingleton<CacheBrowserService>();
+builder.Services.AddSingleton<ActivityTracker>();
+builder.Services.AddHostedService<AccessLogTailService>();
 builder.Services.AddHostedService<PrefillScheduler>();
 builder.Services.AddHostedService<ScanScheduler>();
 
@@ -76,8 +118,17 @@ scanService.RestoreFromDb();
 var session = app.Services.GetRequiredService<SteamSession>();
 app.Use(async (ctx, next) =>
 {
-    var path = ctx.Request.Path.Value ?? "";
-    if (path.StartsWith("/api/") && !path.StartsWith("/api/auth/") && !path.StartsWith("/api/lancache") && !path.StartsWith("/api/events"))
+    // Endpoint routing matches paths case-insensitively, so this gate must too —
+    // otherwise "/Api/apps" would skip the token check yet still reach the endpoint.
+    // StartsWithSegments also enforces segment boundaries ("/api/authx" is not exempt).
+    var path = ctx.Request.Path;
+    if (path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/lancache", StringComparison.OrdinalIgnoreCase)
+        // /api/thumb serves <img> tags, which cannot carry the token header; it
+        // only redirects to public Steam CDN assets (see ThumbEndpoints).
+        && !path.StartsWithSegments("/api/thumb", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/api/events", StringComparison.OrdinalIgnoreCase))
     {
         var token = ctx.Request.Headers["X-Session-Token"].FirstOrDefault();
         if (!SessionAuth.TokensMatch(session.SessionToken, token))
@@ -109,6 +160,10 @@ app.MapPrefillEndpoints();
 app.MapEvictedEndpoints();
 app.MapCacheBrowserEndpoints();
 app.MapSettingsEndpoints();
+app.MapHistoryEndpoints();
+app.MapCacheStatsEndpoints();
+app.MapThumbEndpoints();
+app.MapActivityEndpoints();
 app.MapEventsEndpoint();
 
 app.Lifetime.ApplicationStopping.Register(() =>

@@ -9,3 +9,10 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      # EF Core packages must move in lockstep — a lone Design bump to a new
+      # major dragged EF 9 into the app while tests stayed on EF 8 (CS1705).
+      efcore:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Microsoft.Extensions.Logging.Abstractions"

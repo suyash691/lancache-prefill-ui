@@ -1,13 +1,27 @@
 import { state } from '../state.js';
-import { getToken } from '../api.js';
+import { api } from '../api.js';
 import { updatePrefillUI, setBtns } from './prefill.js';
 import { updateScanUI } from './scan.js';
 import { updateInfoPopover } from '../ui/info.js';
 import { loadApps } from '../pages/selected.js';
 
-export function startSSE() {
+function scheduleRetry() {
+  state.sseRetryDelay = Math.min(state.sseRetryDelay * 1.5, state.sseMaxRetry);
+  setTimeout(startSSE, state.sseRetryDelay);
+}
+
+export async function startSSE() {
   if (window._sse) window._sse.close();
-  const sse = new EventSource(`/api/events?token=${encodeURIComponent(getToken())}`);
+  // Exchange the session token (sent as a header) for a single-use, short-lived
+  // ticket so the long-lived token never appears in the EventSource URL.
+  let ticket;
+  try {
+    ({ ticket } = await api('/api/sse-ticket', { method: 'POST' }));
+  } catch (e) {
+    if (e.message !== 'unauthorized') scheduleRetry();
+    return;
+  }
+  const sse = new EventSource(`/api/events?ticket=${encodeURIComponent(ticket)}`);
   window._sse = sse;
   state.sseRetryDelay = 1500;
   sse.onmessage = e => {
@@ -25,7 +39,6 @@ export function startSSE() {
   };
   sse.onerror = () => {
     sse.close();
-    state.sseRetryDelay = Math.min(state.sseRetryDelay * 1.5, state.sseMaxRetry);
-    setTimeout(startSSE, state.sseRetryDelay);
+    scheduleRetry();
   };
 }

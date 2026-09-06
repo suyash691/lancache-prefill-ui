@@ -20,7 +20,11 @@ export async function api(path, opts = {}) {
   const r = await fetch(path, opts);
 
   if (r.status === 401 && !path.includes('/auth/')) {
+    // A token that stops working means the 7-day session expired (or the
+    // backend re-minted it) — say so instead of a bare login popup.
+    const hadToken = !!token;
     setToken(null);
+    if (hadToken) showToast(t('login.sessionExpired'), 'error');
     showLogin();
     throw new Error('unauthorized');
   }
@@ -63,5 +67,9 @@ export function progressBar(pct, type = 'prefill') {
 }
 
 export function steamThumb(appId) {
-  return `<img class="game-thumb" src="https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg" loading="lazy" onerror="this.style.display='none'">`;
+  // Legacy CDN path first (covers most titles with no backend hop). Titles
+  // released since ~2024 only serve capsules from content-hashed URLs that
+  // cannot be constructed client-side — /api/thumb resolves those via the
+  // store API. Hide the image only when both sources miss.
+  return `<img class="game-thumb" src="https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='/api/thumb/${appId}';}else{this.style.display='none';}">`;
 }

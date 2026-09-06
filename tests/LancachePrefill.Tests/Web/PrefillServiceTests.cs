@@ -141,5 +141,115 @@ public class PrefillServiceTests : IDisposable
         await _downloader.Received(1).GetManifestChunksAsync(Arg.Any<DepotState>());
     }
 
+    [Fact]
+    public async Task Prefill_FetchesOnlyChangedDepots()
+    {
+        // Two depots; only one moved to a new manifest. The sync must fetch chunks
+        // for the changed depot alone — not crawl the unchanged one (the "~314 MB
+        // update downloads the full game" bug).
+        _db.AddSelectedApp(570);
+        var unchanged = new DepotState(571, "game", 100, 570, 570);
+        var changed = new DepotState(572, "vo", 200, 570, 570);
+        _db.MarkDepotsDownloaded([unchanged, new DepotState(572, "vo", 150, 570, 570)]); // 572 stored at old manifest
+
+        _appInfo.GetAppInfoAsync(Arg.Any<IEnumerable<uint>>(), Arg.Any<bool>())
+            .Returns(new List<AppState> { new(570, "Dota 2", [unchanged, changed]) });
+
+        _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
+            .Returns(new List<DownloadChunk> { new(572, "AA", 1024) });
+        _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>(), Arg.Any<bool>())
+            .Returns(new ChunkDownloadResult(1, 0, 1024L, new List<string>()));
+
+        await _service.RunPrefillAsync(force: false);
+
+        await _downloader.Received(1).GetManifestChunksAsync(Arg.Is<DepotState>(d => d.DepotId == 572));
+        await _downloader.DidNotReceive().GetManifestChunksAsync(Arg.Is<DepotState>(d => d.DepotId == 571));
+        // Both depots recorded current after the successful delta sync.
+        Assert.True(_db.IsAppUpToDate(new List<DepotState> { unchanged, changed }));
+    }
+
+    [Fact]
+    public async Task Prefill_Force_FetchesAllDepotsEvenIfUnchanged()
+    {
+        _db.AddSelectedApp(570);
+        var d1 = new DepotState(571, "game", 100, 570, 570);
+        var d2 = new DepotState(572, "vo", 200, 570, 570);
+        _db.MarkDepotsDownloaded([d1, d2]); // everything already current
+
+        _appInfo.GetAppInfoAsync(Arg.Any<IEnumerable<uint>>(), Arg.Any<bool>())
+            .Returns(new List<AppState> { new(570, "Dota 2", [d1, d2]) });
+
+        _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
+            .Returns(new List<DownloadChunk> { new(571, "AA", 512) });
+        _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>(), Arg.Any<bool>())
+            .Returns(new ChunkDownloadResult(2, 0, 1024L, new List<string>()));
+
+        await _service.RunPrefillAsync(force: true);
+
+        await _downloader.Received(2).GetManifestChunksAsync(Arg.Any<DepotState>());
+    }
+
+    [Fact]
+    public async Task Prefill_UpToDateApps_NotCountedInProgressTotal()
+    {
+        // "Sync (2 updates)" must not open a panel claiming all selected apps are
+        // queued: apps with nothing to download are settled as results up front
+        // and excluded from Total / pending.
+        _db.AddSelectedApp(730);
+        _db.AddSelectedApp(570);
+        var currentDepots = new List<DepotState> { new(731, "game", 100, 730, 730) };
+        _db.MarkDepotsDownloaded(currentDepots);
+
+        _appInfo.GetAppInfoAsync(Arg.Any<IEnumerable<uint>>(), Arg.Any<bool>())
+            .Returns(new List<AppState>
+            {
+                new(730, "CS2", currentDepots),                       // up to date -> pre-skipped
+                new(570, "Dota 2", [new(572, "vo", 200, 570, 570)])  // needs download
+            });
+
+        _downloader.GetManifestChunksAsync(Arg.Any<DepotState>())
+            .Returns(new List<DownloadChunk> { new(572, "AA", 1024) });
+        _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>(), Arg.Any<bool>())
+            .Returns(new ChunkDownloadResult(1, 0, 1024L, new List<string>()));
+
+        await _service.RunPrefillAsync(force: false);
+
+        Assert.Equal(1, _jobs.Progress.Total);
+        Assert.Equal(1, _jobs.Progress.Done);
+        Assert.Contains(_jobs.Progress.Results, r => r.AppId == 730 && r.Status == "skipped");
+        Assert.Contains(_jobs.Progress.Results, r => r.AppId == 570 && r.Status == "cached");
+    }
+
+    [Fact]
+    public async Task Prefill_ManifestFailure_DoesNotMarkFailedDepotDownloaded()
+    {
+        // A depot whose manifest fetch failed downloaded nothing. Stamping it as
+        // downloaded would hide the missing content as "current" forever; the app
+        // must come out partial with only the healthy depot recorded.
+        _db.AddSelectedApp(570);
+        var okDepot = new DepotState(571, "game", 100, 570, 570);
+        var badDepot = new DepotState(572, "vo", 200, 570, 570);
+
+        _appInfo.GetAppInfoAsync(Arg.Any<IEnumerable<uint>>(), Arg.Any<bool>())
+            .Returns(new List<AppState> { new(570, "Dota 2", [okDepot, badDepot]) });
+
+        _downloader.GetManifestChunksAsync(Arg.Is<DepotState>(d => d.DepotId == 571))
+            .Returns(new List<DownloadChunk> { new(571, "AA", 512) });
+        _downloader.GetManifestChunksAsync(Arg.Is<DepotState>(d => d.DepotId == 572))
+            .Returns<List<DownloadChunk>>(_ => throw new InvalidOperationException("No manifest code"));
+        _downloader.DownloadChunksWithRetryAsync(Arg.Any<List<DownloadChunk>>(), Arg.Any<int>(),
+            Arg.Any<IProgress<(long, int, int)>?>(), Arg.Any<CancellationToken>(), Arg.Any<long>(), Arg.Any<bool>())
+            .Returns(new ChunkDownloadResult(1, 0, 512L, new List<string>()));
+
+        await _service.RunPrefillAsync(force: false);
+
+        Assert.Contains(_jobs.Progress.Results, r => r.AppId == 570 && r.Status == "partial");
+        Assert.True(_db.IsAppUpToDate(new List<DepotState> { okDepot }));   // healthy depot recorded
+        Assert.False(_db.IsAppUpToDate(new List<DepotState> { badDepot })); // failed depot NOT recorded
+    }
+
     public void Dispose() { _db.Dispose(); try { Directory.Delete(_dir, true); } catch { } }
 }

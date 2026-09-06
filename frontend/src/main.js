@@ -91,6 +91,9 @@ window._app = {
   showMoreLibrary,
   selectFiltered,
   filterCacheBrowser: () => import('./pages/cache-browser.js').then(m => m.filterCacheBrowser()),
+  openTopGames: () => import('./pages/quickadd.js').then(m => m.openTopGames()),
+  quickAddAllOwned: () => import('./pages/quickadd.js').then(m => m.quickAddAllOwned()),
+  addRecentPurchases: () => import('./pages/quickadd.js').then(m => m.addRecentPurchases()),
   saveSettings: () => import('./pages/settings.js').then(m => m.saveSettings()),
   reconcileCache: () => import('./pages/settings.js').then(m => m.reconcileCache()),
 };

@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { api, steamThumb, esc } from '../api.js';
+import { api, steamThumb, esc, fmtB } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { showConfirm } from '../ui/confirm.js';
 import { updateTabCounts } from '../ui/tabs.js';
@@ -13,12 +13,16 @@ export async function loadApps() {
     const data = await api('/api/apps');
     state.apps = data.map(a => a.appId);
     state.appNames = {}; state.utd = {}; state.manifests = {}; state.cachedManifests = {}; state.appStatus = {};
+    state.pendingBytes = {}; state.totalBytes = {}; state.owned = {};
     data.forEach(a => {
       state.appNames[a.appId] = a.name;
       if (a.upToDate !== null) state.utd[a.appId] = a.upToDate;
       if (a.latestManifest) state.manifests[a.appId] = a.latestManifest;
       if (a.cachedManifest) state.cachedManifests[a.appId] = a.cachedManifest;
       if (a.status) state.appStatus[a.appId] = a.status;
+      if (a.pendingBytes) state.pendingBytes[a.appId] = a.pendingBytes;
+      if (a.totalBytes) state.totalBytes[a.appId] = a.totalBytes;
+      if (a.owned === false) state.owned[a.appId] = false;
     });
     updateTabCounts(); updateSyncButton(); renderApps();
     document.getElementById('infoManifests').textContent = new Date().toLocaleTimeString();
@@ -27,7 +31,11 @@ export async function loadApps() {
 
 function updateSyncButton() {
   const n = Object.values(state.utd).filter(v => v === false).length;
-  document.getElementById('bSync').textContent = n > 0 ? `⟳ ${t('actions.syncN', n)}` : `⟳ ${t('actions.sync')}`;
+  // Show the estimated download for a sync: sum of pending bytes across apps
+  // needing work (sizes come from appinfo, no manifest fetches needed).
+  const pending = Object.values(state.pendingBytes || {}).reduce((s, b) => s + b, 0);
+  const est = pending > 0 ? ` (~${fmtB(pending)})` : '';
+  document.getElementById('bSync').textContent = n > 0 ? `⟳ ${t('actions.syncN', n)}${est}` : `⟳ ${t('actions.sync')}`;
 }
 
 export function renderApps() {
@@ -51,15 +59,17 @@ export function renderApps() {
     const appSt = state.appStatus[id];
     let cache = `<span class="badge b">—</span>`;
     if (appSt === 'partial') { cache = `<span class="badge y" title="Partially cached">${t('badge.partial')}</span>`; }
-    else if (sc) { cache = sc.cached ? `<span class="badge g"${cm ? ` title="Cached: ${cm}"` : ''}>${t('badge.cached')}</span>` : sc.error ? '<span class="badge b">—</span>' : `<span class="badge r">${t('badge.missing')}</span>`; }
-    else if (cm) { cache = `<span class="badge g" title="Cached: ${cm}">${t('badge.cached')}</span>`; }
+    else if (sc) { cache = sc.cached ? `<span class="badge g"${cm ? ` title="Cached: ${esc(cm)}"` : ''}>${t('badge.cached')}</span>` : sc.error ? '<span class="badge b">—</span>' : `<span class="badge r">${t('badge.missing')}</span>`; }
+    else if (cm) { cache = `<span class="badge g" title="Cached: ${esc(cm)}">${t('badge.cached')}</span>`; }
     const u = state.utd[id], mf = state.manifests[id] || '';
-    const ver = u === true ? `<span class="badge g" title="Latest: ${mf}">${t('badge.current')}</span>` : u === false ? `<span class="badge y" title="Latest: ${mf}">${t('badge.updateAvailable')}</span>` : '<span class="badge b">—</span>';
+    const pb = state.pendingBytes?.[id];
+    const sizeTag = u === false && pb ? ` <span class="size-hint" title="Estimate — full size of changed depots; the actual download is often smaller (unchanged chunks are already cached)">~${fmtB(pb)}</span>` : '';
+    const ver = u === true ? `<span class="badge g" title="Latest: ${esc(mf)}">${t('badge.current')}</span>` : u === false ? `<span class="badge y" title="Latest: ${esc(mf)}">${t('badge.updateAvailable')}</span>${sizeTag}` : '<span class="badge b">—</span>';
     const needsSync = u === false || (!sc?.cached && u !== true) || appSt === 'partial';
     const actionBtn = needsSync
       ? `<button class="btn btn-a btn-s" data-action="prefillOne" data-id="${id}">⟳ ${t('actions.sync')}</button>`
       : `<button class="btn btn-b btn-s" data-action="checkUpdate" data-id="${id}">${t('actions.check')}</button>`;
-    return `<div class="tr" data-appid="${id}"><span class="col-id"><a href="https://store.steampowered.com/app/${id}" target="_blank">${id}</a></span><span class="game-name">${thumb}<span>${esc(name)}</span></span><span class="col-cache">${cache}</span><span class="col-update">${ver}</span><span>${actionBtn} <button class="btn btn-d btn-s" data-action="rmApp" data-id="${id}">✕</button></span></div>`;
+    return `<div class="tr" data-appid="${id}"><span class="col-id"><a href="https://store.steampowered.com/app/${id}" target="_blank">${id}</a></span><span class="game-name">${thumb}<span>${esc(name)}</span>${state.owned?.[id] === false ? ` <span class="badge r" title="Steam only serves owned content — sync will fail">${t('badge.notOwned')}</span>` : ''}</span><span class="col-cache">${cache}</span><span class="col-update">${ver}</span><span>${actionBtn} <button class="btn btn-d btn-s" data-action="rmApp" data-id="${id}">✕</button></span></div>`;
   }).join('');
   // Attach event listeners
   el.querySelectorAll('[data-action="prefillOne"]').forEach(btn => btn.addEventListener('click', () => prefillOne(btn, parseInt(btn.dataset.id))));
@@ -71,7 +81,11 @@ export async function addById() {
   const input = document.getElementById('addAppId');
   const id = parseInt(input.value);
   if (!id || id < 1) { showToast(t('toast.invalidAppId'), 'error'); return; }
-  try { await api('/api/apps/add', { method: 'POST', body: JSON.stringify({ appId: id }) }); input.value = ''; showToast(t('toast.appAdded', id), 'success'); loadApps(); } catch {}
+  try {
+    const r = await api('/api/apps/add', { method: 'POST', body: JSON.stringify({ appId: id }) });
+    if (r && r.added === false) { showToast(t('toast.appNotFound'), 'error'); return; }
+    input.value = ''; showToast(t('toast.appAdded', id), 'success'); loadApps();
+  } catch {}
 }
 
 async function rmApp(btn, id) {

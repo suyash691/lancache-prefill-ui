@@ -13,7 +13,9 @@ export async function loadCacheBrowser() {
     if (resp.message) { document.getElementById('cacheRows').innerHTML = `<div class="empty">${resp.message}</div>`; return; }
     state.cacheGames = resp.games || []; state.cacheLoaded = true;
     const totalChunks = state.cacheGames.reduce((s, g) => s + g.chunkCount, 0);
-    document.getElementById('infoCacheSize').textContent = totalChunks > 0 ? `~${fmtB(totalChunks * 1048576)} (${totalChunks.toLocaleString()} ${t('cacheBrowser.chunks')})` : '—';
+    const cbEl = document.getElementById('infoCacheSize');
+  cbEl.textContent = totalChunks > 0 ? `~${fmtB(totalChunks * 1048576)} (${totalChunks.toLocaleString()} ${t('cacheBrowser.chunks')})` : '—';
+  if (totalChunks > 0) cbEl.title = 'Rough estimate from indexed Steam chunk count — the ℹ️ popover shows the scan-measured total for the whole cache';
     renderCacheBrowser();
   } catch { document.getElementById('cacheRows').innerHTML = `<div class="empty">${t('selected.failedLoad')}</div>`; }
 }

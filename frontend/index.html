@@ -2,7 +2,8 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23e94560'/><text x='50' y='68' font-size='60' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>LP</text></svg>">
 <title>Lancache Prefill</title>
 </head>
@@ -16,7 +17,7 @@
     <div class="header-actions">
       <span class="info-btn" id="infoBtn" style="display:none" onclick="_app.toggleInfoPopover()">ℹ</span>
       <button class="icon-btn" id="themeToggle" onclick="_app.toggleTheme()" title="Toggle theme">🌙</button>
-      <button class="icon-btn" id="logoutBtn" onclick="_app.doLogout()" style="display:none" title="Disconnect Steam">⏻</button>
+      <button class="icon-btn" id="logoutBtn" onclick="_app.doLogout()" style="display:none" title="Log out">⏻</button>
     </div>
   </div>
 
@@ -25,7 +26,7 @@
     <div class="info-popover-row"><strong>Cache Size</strong> <span id="infoCacheSize">—</span></div>
     <div class="info-popover-row"><strong>Last Sync</strong> <span id="infoLastSync">—</span></div>
     <div class="info-popover-row"><strong>Last Scan</strong> <span id="infoLastScan">—</span></div>
-    <div class="info-popover-row"><strong>Manifests</strong> <span id="infoManifests">—</span></div>
+    <div class="info-popover-row"><strong>Apps refreshed</strong> <span id="infoManifests">—</span></div>
   </div>
 
   <div id="lancacheWarning" class="alert-banner alert-warn" style="display:none">
@@ -45,7 +46,36 @@
     <div class="tab" onclick="_app.switchTab('library')">Steam Library</div>
     <div class="tab" onclick="_app.switchTab('evicted')">Evicted</div>
     <div class="tab" onclick="_app.switchTab('cachebrowser')">Cache Browser</div>
+    <div class="tab" onclick="_app.switchTab('activity')">Activity</div>
+    <div class="tab" onclick="_app.switchTab('history')">History</div>
     <div class="tab" onclick="_app.switchTab('settings')">Settings</div>
+  </div>
+
+  <div id="tabActivity" style="display:none">
+    <p class="tab-desc">Live cache traffic from the lancache access log — hits served locally vs fetched upstream (rolling 24 h window). <span id="actSince"></span></p>
+    <div id="activityUnavailable" class="alert-banner alert-warn" style="display:none">
+      Access log not mounted. Set <code>LANCACHE_LOGS_DIR</code> to the lancache <code>logs/</code> directory to enable this view.
+    </div>
+    <div id="activityContent" style="display:none">
+      <div class="activity-cards">
+        <div class="activity-card"><div class="activity-num" id="actHitRatio">—</div><div class="activity-label">Hit ratio (requests)</div></div>
+        <div class="activity-card"><div class="activity-num" id="actHitBytes">—</div><div class="activity-label">Served from cache</div></div>
+        <div class="activity-card"><div class="activity-num" id="actMissBytes">—</div><div class="activity-label">Fetched upstream</div></div>
+      </div>
+      <div id="activityChart" class="activity-chart"></div>
+      <div class="tbl" style="margin-top:16px">
+        <div class="th-clients"><span>Client</span><span>Data</span><span>Hit %</span><span>Last seen</span></div>
+        <div id="activityClients"><div class="empty">No traffic observed yet.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabHistory" style="display:none">
+    <p class="tab-desc">Past prefill runs — what ran, when, and how much data moved.</p>
+    <div class="tbl">
+      <div class="th-history"><span>Started</span><span>Trigger</span><span>Duration</span><span>Apps</span><span>Data</span><span>Status</span></div>
+      <div id="historyRows"><div class="empty">No prefill runs recorded yet.</div></div>
+    </div>
   </div>
 
   <div id="tabSelected">
@@ -71,6 +101,8 @@
     <div class="lib-toolbar">
       <input class="search" id="libSearch" placeholder="Search your Steam library..." oninput="_app.filterLibrary()" style="flex:1;margin-bottom:0">
       <button class="btn btn-g btn-s" onclick="_app.selectFiltered()">+ Add Filtered</button>
+      <button class="btn btn-b btn-s" onclick="_app.openTopGames()" title="Most played games on Steam right now">★ Top Games</button>
+      <button class="btn btn-b btn-s" onclick="_app.addRecentPurchases()" title="Add games from Steam licenses granted in the last 14 days (includes free weekends and shared licenses)">🛒 Recent Licenses</button>
     </div>
     <div class="tbl">
       <div class="th-lib"><span class="col-id">ID</span><span>Name</span><span></span></div>
@@ -83,7 +115,7 @@
   </div>
 
   <div id="tabEvicted" style="display:none">
-    <p class="tab-desc">Games evicted from Lancache. Excluded from scheduled prefill.</p>
+    <p class="tab-desc">Games evicted from Lancache — the next sync (scheduled or manual) re-downloads them.</p>
     <div class="tbl">
       <div class="th-evict"><span class="col-id">ID</span><span>Name</span><span>Actions</span></div>
       <div id="evictedRows"><div class="empty"><div class="spinner"></div></div></div>
@@ -108,6 +140,7 @@
       <div class="setting-row">
         <label>Scan Schedule (cron)</label>
         <input class="search" id="setScanSchedule" style="margin-bottom:0" placeholder="0 3 */3 * *">
+        <div id="cronTzHint" style="color:var(--muted);font-size:11px;margin-top:4px"></div>
       </div>
       <div class="setting-row">
         <label>Scan Concurrency</label>
@@ -119,7 +152,20 @@
       </div>
       <div class="setting-row">
         <label>Prefill Bandwidth Limit (Mbps, 0 = unlimited)</label>
+        <div style="color:var(--muted);font-size:11px;margin:2px 0 4px">Concurrency and bandwidth are read at the start of each run — changes apply to the next sync.</div>
         <input class="search" id="setPrefillMaxMbps" type="number" min="0" style="margin-bottom:0;width:110px" placeholder="0">
+      </div>
+      <div class="setting-row">
+        <label>Depot Platforms (which OS depots to download)</label>
+        <div style="display:flex;gap:16px;align-items:center">
+          <label style="font-weight:normal"><input type="checkbox" id="setOsWindows" checked> Windows</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsLinux"> Linux</label>
+          <label style="font-weight:normal"><input type="checkbox" id="setOsMacos"> macOS</label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Depot Languages (comma list, e.g. english,german — empty = all)</label>
+        <input class="search" id="setLanguages" style="margin-bottom:0" placeholder="all languages">
       </div>
       <button class="btn btn-a" onclick="_app.saveSettings()">💾 Save</button>
       <span id="settingsSaved" style="color:var(--green);font-size:13px;margin-left:12px;display:none">✓ Saved</span>
@@ -145,6 +191,18 @@
 <div id="scanPanel" class="panel" style="display:none">
   <div class="panel-header"><strong>Lancache Scan</strong><span class="panel-close" onclick="document.getElementById('scanPanel').style.display='none'">×</span></div>
   <div id="scanPanelBody" class="panel-body"></div>
+</div>
+
+<div class="overlay" id="quickAddDialog" style="display:none">
+  <div class="dialog" style="width:420px;max-height:70vh;display:flex;flex-direction:column">
+    <h2 id="quickAddTitle">★ Top Games</h2>
+    <p class="dialog-desc" id="quickAddDesc"></p>
+    <div id="quickAddRows" style="overflow-y:auto;text-align:left;flex:1"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-g dialog-btn" id="quickAddOwnedBtn" onclick="_app.quickAddAllOwned()">+ Add All Owned</button>
+      <span class="link" onclick="document.getElementById('quickAddDialog').style.display='none'">Close</span>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="scanDialog" style="display:none">

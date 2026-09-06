@@ -12,6 +12,7 @@ public class PrefillDbContext : DbContext
     public DbSet<CacheFile> CacheFiles => Set<CacheFile>();
     public DbSet<ScanResultEntity> ScanResults => Set<ScanResultEntity>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<PrefillRun> PrefillRuns => Set<PrefillRun>();
 
     public PrefillDbContext(DbContextOptions<PrefillDbContext> options) : base(options) { }
 
@@ -47,6 +48,14 @@ public class PrefillDbContext : DbContext
                     prop.SetValueConverter(new ValueConverter<uint, long>(v => (long)v, v => (uint)v));
                 else if (prop.ClrType == typeof(ulong))
                     prop.SetValueConverter(new ValueConverter<ulong, long>(v => (long)v, v => (ulong)v));
+
+                // These integer keys are Steam-assigned natural keys (app/depot IDs),
+                // never database-generated. Saying so explicitly keeps the model
+                // stable under EF 9, which otherwise re-derives Sqlite:Autoincrement
+                // for converted integer keys at runtime and trips
+                // PendingModelChangesWarning against the migration snapshot.
+                if (prop.IsPrimaryKey() && (prop.ClrType == typeof(uint) || prop.ClrType == typeof(ulong)))
+                    prop.ValueGenerated = Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never;
             }
     }
 }

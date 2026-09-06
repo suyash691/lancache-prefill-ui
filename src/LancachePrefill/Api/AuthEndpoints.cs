@@ -33,9 +33,11 @@ public static class AuthEndpoints
             catch (Exception ex) { lf.CreateLogger("Auth").LogError(ex, "Login failed"); return Results.Problem("Login failed"); }
         });
 
-        group.MapPost("/logout", (SteamSession session, JobCoordinator jobs) =>
+        group.MapPost("/logout", (SteamSession session) =>
         {
-            jobs.CancelJob();
+            // Deliberately do NOT cancel running jobs: prefill/scan are server-side
+            // scheduled work, and logging out of one browser should not kill a
+            // multi-hour download started elsewhere. The Cancel button exists for that.
             session.InvalidateSession();
             return Results.Ok(new { success = true });
         });

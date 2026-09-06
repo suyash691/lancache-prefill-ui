@@ -2,14 +2,17 @@ namespace LancachePrefill;
 
 // Domain models
 public record AppState(uint AppId, string Name, List<DepotState> Depots);
-public record DepotState(uint DepotId, string? Name, ulong ManifestId, uint AppId, uint ContainingAppId);
+public record DepotState(uint DepotId, string? Name, ulong ManifestId, uint AppId, uint ContainingAppId,
+    long DownloadSize = 0); // compressed bytes from appinfo manifests/public/download; 0 = unknown
 public record DownloadChunk(uint DepotId, string ChunkId, uint CompressedLength);
 public record ScanResult(uint AppId, string Name, bool Cached, string? Error);
 public record ScanJobState(bool Running, string Status, int Done, int Total, List<ScanResult> Results);
 public record QueuedSync(List<uint> AppIds, bool Force);
 
 // Download result from DepotDownloader
-public record ChunkDownloadResult(int Ok, int Failed, long Bytes, List<string> Errors);
+// CachedBytes = compressed size of chunks verified already present in the cache
+// (probe-skipped) — no network transfer, but the content is demonstrably cached.
+public record ChunkDownloadResult(int Ok, int Failed, long Bytes, List<string> Errors, long CachedBytes = 0);
 
 // Per-app prefill result
 public record AppPrefillResult(
@@ -21,7 +24,8 @@ public record AppPrefillResult(
     int ChunksTotal,
     long Bytes,
     List<string> Warnings,
-    List<string> Errors
+    List<string> Errors,
+    long CachedBytes = 0
 );
 
 // Updated prefill progress with per-app results

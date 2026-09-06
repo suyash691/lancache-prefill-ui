@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege for the GITHUB_TOKEN: both jobs only read the repo (checkout).
+# Without this, the token inherits the repository default, which can be
+# write-all — flagged by CodeQL as "Workflow does not contain permissions".
+permissions:
+  contents: read
+
+# Cancel superseded runs when a PR is force-pushed / updated rapidly.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (vitest + vite build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # Also verify the production bundle builds (outputs to src/LancachePrefill/wwwroot,
+      # which is gitignored — the Docker image builds it the same way).
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend (dotnet test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore LancachePrefill.sln
+
+      - name: Build
+        run: dotnet build LancachePrefill.sln --no-restore --configuration Release
+
+      # Runs the full suite including the WebApplicationFactory integration tests
+      # (they self-provision CONFIG_DIR temp dirs, so no extra setup is needed).
+      - name: Test
+        run: dotnet test tests/LancachePrefill.Tests/LancachePrefill.Tests.csproj
+          --no-build --configuration Release --verbosity normal

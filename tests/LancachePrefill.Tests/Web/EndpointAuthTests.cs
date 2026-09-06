@@ -39,6 +39,15 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
     private HttpClient Client() => _factory.CreateClient();
 
     [Fact]
+    public async Task Thumb_Endpoint_IsPublic()
+    {
+        // <img> tags cannot send the session-token header, so /api/thumb is
+        // exempt from the auth gate. Any status is fine except 401.
+        var resp = await Client().GetAsync("/api/thumb/730");
+        Assert.NotEqual(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task Lancache_Endpoint_IsPublic()
     {
         var resp = await Client().GetAsync("/api/lancache");
@@ -63,6 +72,19 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
+    // Endpoint routing is case-insensitive, so the auth gate must be too.
+    // These would return 200 with the old case-sensitive StartsWith gate.
+    [Theory]
+    [InlineData("/Api/apps")]
+    [InlineData("/API/settings")]
+    [InlineData("/api/Apps")]
+    [InlineData("/API/EVENTS")] // SSE gate is its own token check — must still 401
+    public async Task ProtectedEndpoint_CaseVariantPath_NoToken_Returns401(string path)
+    {
+        var resp = await Client().GetAsync(path);
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
     [Fact]
     public async Task ProtectedEndpoint_WrongToken_Returns401()
     {
@@ -80,16 +102,31 @@ public class EndpointAuthTests : IClassFixture<LcpAppFactory>
     }
 
     [Fact]
-    public async Task Sse_NoToken_Returns401()
+    public async Task Sse_NoTicket_Returns401()
     {
         var resp = await Client().GetAsync("/api/events");
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
     [Fact]
-    public async Task Sse_WrongToken_Returns401()
+    public async Task Sse_BogusTicket_Returns401()
     {
+        var resp = await Client().GetAsync("/api/events?ticket=bogus");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Sse_LegacyTokenParam_Returns401()
+    {
+        // The long-lived session token is no longer accepted on the SSE URL.
         var resp = await Client().GetAsync("/api/events?token=bogus");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task SseTicket_Endpoint_RequiresAuth()
+    {
+        var resp = await Client().PostAsync("/api/sse-ticket", null);
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 }
