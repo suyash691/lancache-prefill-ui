@@ -5,6 +5,12 @@ on:
   push:
     branches: [main]
 
+# Least privilege for the GITHUB_TOKEN: both jobs only read the repo (checkout).
+# Without this, the token inherits the repository default, which can be
+# write-all — flagged by CodeQL as "Workflow does not contain permissions".
+permissions:
+  contents: read
+
 # Cancel superseded runs when a PR is force-pushed / updated rapidly.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
