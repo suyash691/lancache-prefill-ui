@@ -62,7 +62,7 @@ export function renderApps() {
     else if (cm) { cache = `<span class="badge g" title="Cached: ${esc(cm)}">${t('badge.cached')}</span>`; }
     const u = state.utd[id], mf = state.manifests[id] || '';
     const pb = state.pendingBytes?.[id];
-    const sizeTag = u === false && pb ? ` <span class="size-hint" title="Estimated download">~${fmtB(pb)}</span>` : '';
+    const sizeTag = u === false && pb ? ` <span class="size-hint" title="Estimate — full size of changed depots; the actual download is often smaller (unchanged chunks are already cached)">~${fmtB(pb)}</span>` : '';
     const ver = u === true ? `<span class="badge g" title="Latest: ${esc(mf)}">${t('badge.current')}</span>` : u === false ? `<span class="badge y" title="Latest: ${esc(mf)}">${t('badge.updateAvailable')}</span>${sizeTag}` : '<span class="badge b">—</span>';
     const needsSync = u === false || (!sc?.cached && u !== true) || appSt === 'partial';
     const actionBtn = needsSync

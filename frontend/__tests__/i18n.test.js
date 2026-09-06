@@ -7,7 +7,7 @@ describe('i18n', () => {
   });
 
   it('returns nested key', () => {
-    expect(t('toast.prefillStarted')).toBe('Prefill started');
+    expect(t('toast.prefillStarted')).toBe('Sync requested');
   });
 
   it('replaces positional arguments', () => {

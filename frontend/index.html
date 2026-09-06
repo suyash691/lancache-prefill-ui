@@ -17,7 +17,7 @@
     <div class="header-actions">
       <span class="info-btn" id="infoBtn" style="display:none" onclick="_app.toggleInfoPopover()">ℹ</span>
       <button class="icon-btn" id="themeToggle" onclick="_app.toggleTheme()" title="Toggle theme">🌙</button>
-      <button class="icon-btn" id="logoutBtn" onclick="_app.doLogout()" style="display:none" title="Disconnect Steam">⏻</button>
+      <button class="icon-btn" id="logoutBtn" onclick="_app.doLogout()" style="display:none" title="Log out">⏻</button>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
     <div class="info-popover-row"><strong>Cache Size</strong> <span id="infoCacheSize">—</span></div>
     <div class="info-popover-row"><strong>Last Sync</strong> <span id="infoLastSync">—</span></div>
     <div class="info-popover-row"><strong>Last Scan</strong> <span id="infoLastScan">—</span></div>
-    <div class="info-popover-row"><strong>Manifests</strong> <span id="infoManifests">—</span></div>
+    <div class="info-popover-row"><strong>Apps refreshed</strong> <span id="infoManifests">—</span></div>
   </div>
 
   <div id="lancacheWarning" class="alert-banner alert-warn" style="display:none">
@@ -52,13 +52,13 @@
   </div>
 
   <div id="tabActivity" style="display:none">
-    <p class="tab-desc">Live cache traffic from the lancache access log — hits served locally vs fetched upstream (last 24h).</p>
+    <p class="tab-desc">Live cache traffic from the lancache access log — hits served locally vs fetched upstream (rolling 24 h window). <span id="actSince"></span></p>
     <div id="activityUnavailable" class="alert-banner alert-warn" style="display:none">
       Access log not mounted. Set <code>LANCACHE_LOGS_DIR</code> to the lancache <code>logs/</code> directory to enable this view.
     </div>
     <div id="activityContent" style="display:none">
       <div class="activity-cards">
-        <div class="activity-card"><div class="activity-num" id="actHitRatio">—</div><div class="activity-label">Hit ratio</div></div>
+        <div class="activity-card"><div class="activity-num" id="actHitRatio">—</div><div class="activity-label">Hit ratio (requests)</div></div>
         <div class="activity-card"><div class="activity-num" id="actHitBytes">—</div><div class="activity-label">Served from cache</div></div>
         <div class="activity-card"><div class="activity-num" id="actMissBytes">—</div><div class="activity-label">Fetched upstream</div></div>
       </div>
@@ -102,7 +102,7 @@
       <input class="search" id="libSearch" placeholder="Search your Steam library..." oninput="_app.filterLibrary()" style="flex:1;margin-bottom:0">
       <button class="btn btn-g btn-s" onclick="_app.selectFiltered()">+ Add Filtered</button>
       <button class="btn btn-b btn-s" onclick="_app.openTopGames()" title="Most played games on Steam right now">★ Top Games</button>
-      <button class="btn btn-b btn-s" onclick="_app.addRecentPurchases()" title="Add games from licenses granted in the last 14 days">🛒 Recent Purchases</button>
+      <button class="btn btn-b btn-s" onclick="_app.addRecentPurchases()" title="Add games from Steam licenses granted in the last 14 days (includes free weekends and shared licenses)">🛒 Recent Licenses</button>
     </div>
     <div class="tbl">
       <div class="th-lib"><span class="col-id">ID</span><span>Name</span><span></span></div>
@@ -115,7 +115,7 @@
   </div>
 
   <div id="tabEvicted" style="display:none">
-    <p class="tab-desc">Games evicted from Lancache. Excluded from scheduled prefill.</p>
+    <p class="tab-desc">Games evicted from Lancache — the next sync (scheduled or manual) re-downloads them.</p>
     <div class="tbl">
       <div class="th-evict"><span class="col-id">ID</span><span>Name</span><span>Actions</span></div>
       <div id="evictedRows"><div class="empty"><div class="spinner"></div></div></div>
@@ -151,6 +151,7 @@
       </div>
       <div class="setting-row">
         <label>Prefill Bandwidth Limit (Mbps, 0 = unlimited)</label>
+        <div style="color:var(--muted);font-size:11px;margin:2px 0 4px">Concurrency and bandwidth are read at the start of each run — changes apply to the next sync.</div>
         <input class="search" id="setPrefillMaxMbps" type="number" min="0" style="margin-bottom:0;width:110px" placeholder="0">
       </div>
       <div class="setting-row">

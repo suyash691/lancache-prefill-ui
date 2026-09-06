@@ -52,10 +52,10 @@ export async function quickAddAllOwned() {
 export async function addRecentPurchases() {
   let items;
   try { items = await api('/api/library/recent-purchases?days=14'); }
-  catch { showToast('Failed to load recent purchases', 'error'); return; }
+  catch { showToast('Failed to load recent licenses', 'error'); return; }
   const fresh = items.filter(i => !i.selected);
   if (!fresh.length) { showToast('No new purchases in the last 14 days', 'info'); return; }
   for (const i of fresh) await addOne(i.appId);
-  showToast(`Added ${fresh.length} recent purchase${fresh.length > 1 ? 's' : ''}`, 'success');
+  showToast(`Added ${fresh.length} recent license${fresh.length > 1 ? 's' : ''}`, 'success');
   loadApps();
 }

@@ -15,9 +15,8 @@ async function refreshCacheStats() {
     if (!s.available) return;
     const used = s.cacheBytes != null ? fmtB(s.cacheBytes) : '?';
     const free = s.diskFreeBytes != null ? ` · ${fmtB(s.diskFreeBytes)} free` : '';
-    document.getElementById('infoCacheSize').textContent = `${used}${free}`;
-    if (s.scannedAt)
-      document.getElementById('infoCacheSize').title = `Measured by scan ${timeAgo(new Date(s.scannedAt))}`;
+    const scanned = s.scannedAt ? ` · scanned ${timeAgo(new Date(s.scannedAt))}` : '';
+    document.getElementById('infoCacheSize').textContent = `${used}${free}${scanned}`;
   } catch { /* leave placeholder */ }
 }
 
